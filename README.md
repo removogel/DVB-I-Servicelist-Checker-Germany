@@ -105,6 +105,9 @@ werden dann als Warnung gemeldet, weil strikt validierende Clients die Liste abl
 
 ## Entwicklung
 
+Architektur, Konventionen (Befund-Codes, Schweregrade, Referenzen) und das Vorgehen für
+neue Module stehen in [`CLAUDE.md`](CLAUDE.md).
+
 ```bash
 pip install -e ".[dev]"
 python -m pytest            # oder: python -m unittest discover -s tests

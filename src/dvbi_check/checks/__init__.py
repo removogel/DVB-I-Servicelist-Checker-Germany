@@ -20,7 +20,7 @@ class Context:
     offline: bool = False
 
 
-ORDER = ["schema", "a177", "profile", "cg", "images"]
+ORDER = ["schema", "a177", "profile", "cg", "images", "ait", "mpd"]
 
 
 _MODULES = {
@@ -29,6 +29,8 @@ _MODULES = {
     "profile": "profile_de",
     "cg": "contentguide",
     "images": "images",
+    "ait": "ait",
+    "mpd": "mpd",
 }
 
 

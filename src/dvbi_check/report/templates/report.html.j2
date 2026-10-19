@@ -96,6 +96,8 @@ tr.clickable{cursor:pointer}
   <a href="#ueberblick">Überblick</a><a href="#services">Services</a>
   {% if cg_rows %}<a href="#epg">EPG-Abdeckung</a>{% endif %}
   {% if img_rows %}<a href="#logos">Logos</a>{% endif %}
+  {% if ait_rows %}<a href="#aits">AITs</a>{% endif %}
+  {% if mpd_rows %}<a href="#manifeste">Manifeste</a>{% endif %}
   <a href="#befunde">Befunde</a>
 </nav>
 
@@ -125,6 +127,8 @@ tr.clickable{cursor:pointer}
     {% elif m.name == "a177" and m.stats.services %}{{ m.stats.instances }} Instanzen · {{ m.stats.lcn_tables }} LCN-Tabellen · {{ m.stats.regions }} Regionen
     {% elif m.name == "profile" and m.stats.lcn_distinct %}{{ m.stats.lcn_distinct }} LCNs · Referenz: {{ m.stats.reference_table }}
     {% elif m.name == "cg" and m.stats.services_checked %}Now/Next ok: {{ m.stats.now_next_ok }}/{{ m.stats.services_checked }} · volle Vorschau: {{ m.stats.full_future_coverage }}/{{ m.stats.services_checked }}
+    {% elif m.name == "ait" and m.stats.aits_checked %}{{ m.stats.aits_reachable }}/{{ m.stats.aits_checked }} erreichbar · {{ m.stats.aits_without_errors }} ohne Fehler
+    {% elif m.name == "mpd" and m.stats.mpds_checked %}{{ m.stats.mpds_reachable }}/{{ m.stats.mpds_checked }} MPDs erreichbar · {{ m.stats.mpds_without_errors }} ohne Fehler{% if m.stats.hls_checked %} · {{ m.stats.hls_checked }} HLS{% endif %}
     {% elif m.name == "images" and m.stats.logos_checked %}{{ m.stats.logos_reachable }}/{{ m.stats.logos_checked }} erreichbar · {{ m.stats.width_ok }} mit Sollbreite · {{ m.stats.mandatory_variants_complete }} mit allen Pflichtvarianten
     {% endif %}
     </div>
@@ -139,7 +143,7 @@ tr.clickable{cursor:pointer}
 <div class="legend"><span><i class="dot"></i> ohne Befund</span><span><i class="dot warn"></i> Warnung</span><span><i class="dot err"></i> Fehler</span><span><i class="dot skip"></i> nicht geprüft</span><span>Klick auf eine Zeile filtert die Befunde</span></div>
 <div class="panel scroll">
 <table id="svcTable">
-<thead><tr><th>LCN</th><th>Service</th><th>Anbieter</th><th>Typ</th>{% for m in mods %}<th class="c" title="{{ m.title }}">{{ {"schema":"Schema","a177":"A177","profile":"Profil","cg":"EPG","images":"Logo"}[m.name] }}</th>{% endfor %}<th class="c">Fehler</th></tr></thead>
+<thead><tr><th>LCN</th><th>Service</th><th>Anbieter</th><th>Typ</th>{% for m in mods %}<th class="c" title="{{ m.title }}">{{ {"schema":"Schema","a177":"A177","profile":"Profil","cg":"EPG","images":"Logo","ait":"AIT","mpd":"MPD"}.get(m.name, m.name) }}</th>{% endfor %}<th class="c">Fehler</th></tr></thead>
 <tbody>
 {% for r in rows %}
 <tr class="clickable" data-uid="{{ r.uid }}" data-text="{{ (r.name ~ ' ' ~ r.provider ~ ' ' ~ r.uid)|lower }}">
@@ -192,6 +196,51 @@ tr.clickable{cursor:pointer}
   <td><span class="pill {{ 'ok' if i.bytes <= cfg.logo_max_bytes else 'warn' }}">{{ (i.bytes / 1024)|round(1) }} kB</span></td>
   {% for v in cfg.logo_variants_mandatory %}{% set st = i.variants.get(v, "–") %}<td><span class="pill {{ 'ok' if st.startswith('ok') else 'warn' if 'identisch' in st else 'err' if st != '–' else 'skip' }}">{{ st }}</span></td>{% endfor %}
   <td>{{ i.width_param or "–" }}</td>
+</tr>
+{% endfor %}
+</tbody></table></div>
+</section>
+{% endif %}
+
+{% if ait_rows %}
+<section id="aits">
+<h2>XML-AITs</h2>
+<div class="panel scroll">
+<table>
+<thead><tr><th>URL</th><th>HTTP</th><th>Content-Type</th><th>Typ</th><th>Anwendungen</th><th>Befunde</th></tr></thead>
+<tbody>
+{% for a in ait_rows %}
+<tr>
+  <td class="mono"><a href="{{ a.url }}" target="_blank" rel="noopener">{{ a.url }}</a></td>
+  <td><span class="pill {{ 'ok' if a.status and 200 <= a.status < 300 else 'err' }}">{{ a.status or "–" }}</span></td>
+  <td><span class="pill {{ 'ok' if a.content_type == 'application/vnd.dvb.ait+xml' else 'warn' }}">{{ a.content_type or "–" }}</span></td>
+  <td>{{ a.kinds|join(", ") }}</td>
+  <td>{% for ap in a.apps %}<div>{{ ap.name or "(ohne Name)" }} <span class="sub">{{ ap.controlCode or "–" }}{% if ap.version %} · HbbTV {{ ap.version }}{% endif %}{% if ap.entry_status %} · Einstieg {{ ap.entry_status }}{% endif %}</span></div>{% else %}–{% endfor %}</td>
+  <td>{% if a.issues %}<span class="pill warn">{{ a.issues }}</span>{% else %}<span class="pill ok">0</span>{% endif %}</td>
+</tr>
+{% endfor %}
+</tbody></table></div>
+</section>
+{% endif %}
+
+{% if mpd_rows %}
+<section id="manifeste">
+<h2>Stream-Manifeste</h2>
+<div class="panel scroll">
+<table>
+<thead><tr><th>URL</th><th>Art</th><th>HTTP</th><th>Typ</th><th>Max. Video</th><th>Codecs</th><th>DRM</th><th>Antwort</th><th>Befunde</th></tr></thead>
+<tbody>
+{% for d in mpd_rows %}
+<tr>
+  <td class="mono"><a href="{{ d.url }}" target="_blank" rel="noopener">{{ d.url }}</a></td>
+  <td>{{ d.kind|upper }}</td>
+  <td><span class="pill {{ 'ok' if d.status and 200 <= d.status < 300 else 'err' }}">{{ d.status or "–" }}</span></td>
+  <td>{{ d.type or "–" }}</td>
+  <td>{% if d.video_max %}{{ d.video_max[0] }}×{{ d.video_max[1] }}{% if d.video_max_bandwidth %} <span class="sub">{{ "%.1f"|format(d.video_max_bandwidth / 1e6) }} Mbit/s</span>{% endif %}{% else %}–{% endif %}</td>
+  <td>{{ (d.codecs or {}).keys()|join(", ") or "–" }}</td>
+  <td>{{ (d.drm_systems or [])|length or "–" }}</td>
+  <td>{{ "%.2f s"|format(d.elapsed_s) }}</td>
+  <td>{% if d.issues %}<span class="pill warn">{{ d.issues }}</span>{% else %}<span class="pill ok">0</span>{% endif %}</td>
 </tr>
 {% endfor %}
 </tbody></table></div>

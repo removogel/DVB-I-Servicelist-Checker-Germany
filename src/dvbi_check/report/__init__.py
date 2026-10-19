@@ -134,6 +134,10 @@ def build_view(rr: RunResult) -> dict:
             cg_rows.append({**row, "day_cells": [days.get(d) for d in cg_days]})
     img = rr.module("images")
     img_rows = img.stats.get("images", []) if img and not img.skipped else []
+    ait = rr.module("ait")
+    ait_rows = ait.stats.get("aits", []) if ait and not ait.skipped else []
+    mpd = rr.module("mpd")
+    mpd_rows = mpd.stats.get("manifests", []) if mpd and not mpd.skipped else []
 
     tz = ZoneInfo("Europe/Berlin")
     return {
@@ -142,7 +146,7 @@ def build_view(rr: RunResult) -> dict:
         "counts": {s.name.lower(): rr.count(s) for s in Severity},
         "svc_total": svc_total, "svc_clean": svc_clean,
         "readiness": round(100 * svc_clean / svc_total) if svc_total else 0,
-        "cg_rows": cg_rows, "cg_days": cg_days, "img_rows": img_rows, "cfg": rr.cfg,
+        "cg_rows": cg_rows, "cg_days": cg_days, "img_rows": img_rows, "ait_rows": ait_rows, "mpd_rows": mpd_rows, "cfg": rr.cfg,
         "started": rr.started.astimezone(tz).strftime("%d.%m.%Y %H:%M"),
         "duration": round((rr.finished - rr.started).total_seconds(), 1) if rr.finished else None,
         "schema": rr.module("schema").stats if rr.module("schema") else {},

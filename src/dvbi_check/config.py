@@ -54,6 +54,17 @@ class Config:
         "square_colour_light", "square_colour_dark"])
     check_optional_variants: bool = False
 
+    # XML-AIT
+    ait_xsd: str | None = None              # optional: Pfad zu mis_xmlait.xsd (ETSI TS 102 809)
+    ait_check_app_url: bool = True          # Einstiegs-URL der Anwendung abrufen
+
+    # Stream-Manifeste
+    mpd_min_width: int = 960                # Book 7.3: Mindestqualität 960x540p
+    mpd_min_height: int = 540
+    mpd_min_bandwidth: int = 2_500_000      # Book 7.3: > 2,5 Mbit/s
+    mpd_slow_seconds: float = 2.0
+    check_hls: bool = True                  # HLS-Playlists (OtherDeliveryParameters) auf Erreichbarkeit prüfen
+
     @classmethod
     def load(cls, path: str | Path | None) -> "Config":
         cfg = cls()

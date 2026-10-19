@@ -60,6 +60,53 @@ def tva(body: str) -> bytes:
             f'<ProgramDescription>{body}</ProgramDescription></TVAMain>').encode()
 
 
+AIT_OK = """<?xml version="1.0" encoding="UTF-8"?>
+<mhp:ServiceDiscovery xmlns:mhp="urn:dvb:mhp:2009" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+ <mhp:ApplicationDiscovery DomainName="example.org">
+  <mhp:ApplicationList>
+   <mhp:Application>
+    <mhp:appName Language="deu">Event-App</mhp:appName>
+    <mhp:applicationIdentifier><mhp:orgId>123</mhp:orgId><mhp:appId>1</mhp:appId></mhp:applicationIdentifier>
+    <mhp:applicationDescriptor>
+     <mhp:type><mhp:OtherApp>application/vnd.hbbtv.xhtml+xml</mhp:OtherApp></mhp:type>
+     <mhp:controlCode>AUTOSTART</mhp:controlCode>
+     <mhp:visibility>VISIBLE_ALL</mhp:visibility>
+     <mhp:serviceBound>false</mhp:serviceBound>
+     <mhp:priority>1</mhp:priority>
+     <mhp:version>01</mhp:version>
+     <mhp:mhpVersion><mhp:profile>0</mhp:profile><mhp:versionMajor>1</mhp:versionMajor><mhp:versionMinor>7</mhp:versionMinor><mhp:versionMicro>1</mhp:versionMicro></mhp:mhpVersion>
+    </mhp:applicationDescriptor>
+    <mhp:applicationTransport xsi:type="mhp:HTTPTransportType"><mhp:URLBase>{base}/app/</mhp:URLBase></mhp:applicationTransport>
+    <mhp:applicationLocation>index.html</mhp:applicationLocation>
+   </mhp:Application>
+  </mhp:ApplicationList>
+ </mhp:ApplicationDiscovery>
+</mhp:ServiceDiscovery>"""
+
+AIT_BAD = """<?xml version="1.0" encoding="UTF-8"?>
+<mhp:ServiceDiscovery xmlns:mhp="urn:dvb:mhp:2009"><mhp:ApplicationDiscovery DomainName="example.org"><mhp:ApplicationList>
+ <mhp:Application>
+  <mhp:applicationIdentifier><mhp:orgId>abc</mhp:orgId><mhp:appId>1</mhp:appId></mhp:applicationIdentifier>
+  <mhp:applicationDescriptor><mhp:type><mhp:OtherApp>text/html</mhp:OtherApp></mhp:type><mhp:controlCode>PRESENT</mhp:controlCode></mhp:applicationDescriptor>
+ </mhp:Application>
+</mhp:ApplicationList></mhp:ApplicationDiscovery></mhp:ServiceDiscovery>"""
+
+
+def mpd(dynamic=True, dvb=True, width=1280, height=720, bw=5000000, video=True) -> bytes:
+    prof = "urn:dvb:dash:profile:dvb-dash:2014,urn:mpeg:dash:profile:isoff-live:2011" if dvb else "urn:mpeg:dash:profile:isoff-live:2011"
+    head = (f'type="dynamic" availabilityStartTime="2026-01-01T00:00:00Z" minimumUpdatePeriod="PT10S"'
+            if dynamic else 'type="static" mediaPresentationDuration="PT1H"')
+    utc = '<UTCTiming schemeIdUri="urn:mpeg:dash:utc:http-xsdate:2014" value="https://time.example.org/"/>' if dynamic else ""
+    vid = (f'<AdaptationSet contentType="video" mimeType="video/mp4" segmentAlignment="true">'
+           f'<Representation id="v1" codecs="avc3.640020" bandwidth="{bw}" width="{width}" height="{height}"/>'
+           f'</AdaptationSet>') if video else ""
+    return (f'<?xml version="1.0"?><MPD xmlns="urn:mpeg:dash:schema:mpd:2011" profiles="{prof}" {head} '
+            f'minBufferTime="PT2S"><Period id="1" start="PT0S">{vid}'
+            f'<AdaptationSet contentType="audio" mimeType="audio/mp4" lang="de">'
+            f'<Representation id="a1" codecs="mp4a.40.2" bandwidth="128000" audioSamplingRate="48000"/>'
+            f'</AdaptationSet></Period>{utc}</MPD>').encode()
+
+
 class Handler(BaseHTTPRequestHandler):
     base = ""
 
@@ -88,6 +135,18 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(png(320, 180), "image/png")
         if p == "/logo/bad.png":   # falsche Breite, ignoriert Varianten
             return self.send(png(200, 200), "image/png")
+        if p == "/ait/ok.aitx":
+            return self.send(AIT_OK.format(base=self.base).encode(), "application/vnd.dvb.ait+xml")
+        if p == "/ait/bad.aitx":
+            return self.send(AIT_BAD.encode(), "text/plain")
+        if p == "/app/index.html":
+            return self.send(b"<!DOCTYPE html><html><body>App</body></html>", "application/vnd.hbbtv.xhtml+xml")
+        if p == "/mpd/live.mpd":
+            return self.send(mpd(), "application/dash+xml")
+        if p == "/mpd/low.mpd":
+            return self.send(mpd(dynamic=False, dvb=False, width=640, height=360, bw=1000000), "application/xml")
+        if p == "/mpd/radio.mpd":
+            return self.send(mpd(video=False), "application/dash+xml")
         if p == "/epg/img.jpg":
             return self.send(jpeg(640, 360), "image/jpeg")
         if p == "/cg/schedule":

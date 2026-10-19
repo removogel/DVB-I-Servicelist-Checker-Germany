@@ -40,3 +40,14 @@ image_variant_param = "image_variant"
 image_width_param = "w"
 logo_variants_mandatory = ["16x9_colour", "16x9_colour_light", "16x9_colour_dark"]
 check_optional_variants = false
+
+[ait]
+# ait_xsd = "schemas/mis_xmlait.xsd"   # optional: XML-AIT-Schema aus ETSI TS 102 809
+ait_check_app_url = true               # Einstiegsseite der Anwendung abrufen
+
+[mpd]
+mpd_min_width = 960                    # Book 7.3: Mindestqualität 960x540p
+mpd_min_height = 540
+mpd_min_bandwidth = 2500000            # Book 7.3: > 2,5 Mbit/s
+mpd_slow_seconds = 2.0
+check_hls = true

@@ -63,7 +63,7 @@
     <ServiceInstance priority="2">
       <DisplayName>Eins Stream</DisplayName>
       <DASHDeliveryParameters>
-        <UriBasedLocation contentType="application/dash+xml"><dvbi-types:URI>https://stream.example.org/eins.mpd</dvbi-types:URI></UriBasedLocation>
+        <UriBasedLocation contentType="application/dash+xml"><dvbi-types:URI>{BASE}/mpd/live.mpd</dvbi-types:URI></UriBasedLocation>
       </DASHDeliveryParameters>
     </ServiceInstance>
     <ServiceName>Eins</ServiceName>
@@ -95,7 +95,7 @@
   <Service version="1">
     <UniqueIdentifier>tag:ard.de,2021:nord</UniqueIdentifier>
     <ServiceInstance priority="1"><DisplayName>Nord</DisplayName>
-      <DASHDeliveryParameters><UriBasedLocation contentType="application/dash+xml"><dvbi-types:URI>https://stream.example.org/nord.mpd</dvbi-types:URI></UriBasedLocation></DASHDeliveryParameters>
+      <DASHDeliveryParameters><UriBasedLocation contentType="application/dash+xml"><dvbi-types:URI>{BASE}/mpd/low.mpd</dvbi-types:URI></UriBasedLocation></DASHDeliveryParameters>
     </ServiceInstance>
     <ServiceName>ARD Nord</ServiceName><ProviderName>ARD</ProviderName>
     <ServiceType href="urn:dvb:metadata:cs:ServiceTypeCS:2019:linear"/>
@@ -103,7 +103,7 @@
   <Service version="1">
     <UniqueIdentifier>tag:ard.de,2021:sr</UniqueIdentifier>
     <ServiceInstance priority="1"><DisplayName>SR</DisplayName>
-      <DASHDeliveryParameters><UriBasedLocation contentType="application/dash+xml"><dvbi-types:URI>https://stream.example.org/sr.mpd</dvbi-types:URI></UriBasedLocation></DASHDeliveryParameters>
+      <DASHDeliveryParameters><UriBasedLocation contentType="application/dash+xml"><dvbi-types:URI>{BASE}/mpd/live.mpd</dvbi-types:URI></UriBasedLocation></DASHDeliveryParameters>
     </ServiceInstance>
     <ServiceName>ARD SR</ServiceName><ProviderName>ARD</ProviderName>
     <ServiceType href="urn:dvb:metadata:cs:ServiceTypeCS:2019:linear"/>
@@ -111,7 +111,7 @@
   <Service version="1">
     <UniqueIdentifier>tag:ard.de,2021:swr</UniqueIdentifier>
     <ServiceInstance priority="1"><DisplayName>SWR</DisplayName>
-      <DASHDeliveryParameters><UriBasedLocation contentType="application/dash+xml"><dvbi-types:URI>https://stream.example.org/swr.mpd</dvbi-types:URI></UriBasedLocation></DASHDeliveryParameters>
+      <DASHDeliveryParameters><UriBasedLocation contentType="application/dash+xml"><dvbi-types:URI>{BASE}/mpd/missing.mpd</dvbi-types:URI></UriBasedLocation></DASHDeliveryParameters>
     </ServiceInstance>
     <ServiceName>ARD SWR</ServiceName><ProviderName>ARD</ProviderName>
     <ServiceType href="urn:dvb:metadata:cs:ServiceTypeCS:2019:linear"/>
@@ -121,7 +121,7 @@
     <ServiceInstance priority="1"><DisplayName>Event</DisplayName>
       <RelatedMaterial>
         <tva:HowRelated href="urn:dvb:metadata:cs:LinkedApplicationCS:2019:1.2"/>
-        <tva:MediaLocator><tva:MediaUri contentType="application/vnd.dvb.ait+xml">https://app.example.org/event.aitx</tva:MediaUri></tva:MediaLocator>
+        <tva:MediaLocator><tva:MediaUri contentType="application/vnd.dvb.ait+xml">{BASE}/ait/ok.aitx</tva:MediaUri></tva:MediaLocator>
       </RelatedMaterial>
     </ServiceInstance>
     <ServiceName>Event-Kanal</ServiceName><ProviderName>Beispiel</ProviderName>
@@ -130,7 +130,7 @@
   <Service version="1">
     <UniqueIdentifier>tag:example.org,2026:radio-luecke</UniqueIdentifier>
     <ServiceInstance priority="1"><DisplayName>Radio</DisplayName>
-      <DASHDeliveryParameters><UriBasedLocation contentType="application/dash+xml"><dvbi-types:URI>https://stream.example.org/radio.mpd</dvbi-types:URI></UriBasedLocation></DASHDeliveryParameters>
+      <DASHDeliveryParameters><UriBasedLocation contentType="application/dash+xml"><dvbi-types:URI>{BASE}/mpd/radio.mpd</dvbi-types:URI></UriBasedLocation></DASHDeliveryParameters>
     </ServiceInstance>
     <ServiceName>Radio Drei</ServiceName><ProviderName>Beispiel</ProviderName>
     <ServiceType href="urn:dvb:metadata:cs:ServiceTypeCS:2019:linear"/>
@@ -142,7 +142,7 @@
     <ServiceInstance priority="1"><DisplayName>Ende</DisplayName>
       <RelatedMaterial>
         <tva:HowRelated href="urn:dvb:metadata:cs:LinkedApplicationCS:2019:1.2"/>
-        <tva:MediaLocator><tva:MediaUri contentType="application/vnd.dvb.ait+xml">https://app.example.org/end.aitx</tva:MediaUri></tva:MediaLocator>
+        <tva:MediaLocator><tva:MediaUri contentType="application/vnd.dvb.ait+xml">{BASE}/ait/bad.aitx</tva:MediaUri></tva:MediaLocator>
       </RelatedMaterial>
     </ServiceInstance>
     <ServiceName>Ende der Liste</ServiceName><ProviderName>Beispiel</ProviderName>

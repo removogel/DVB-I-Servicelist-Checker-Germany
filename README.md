@@ -10,6 +10,8 @@ Es erzeugt eine Auswertung als HTML-Report, JSON und CSV.
 | `a177` | Semantik nach Standard: eindeutige IDs, tag:-URIs, Classification-Scheme-Werte, Regionen und PLZ-Überlappungen, LCN-Referenzen, Zustellparameter, Logos, Content-Guide-Verweise |
 | `profile` | Vollständigkeit nach Book und DTVP: „M“-Felder aus IT-6, Direct Tuning DVB-S (IT-13), Broadband-Instanz (Book 7.3), DRM über Linked App (Book 11.3), Content-Guide-Proxy (Book 12), LCN-Plan nach Book 6.6 (Blöcke, LCN 7/41–49, 50/51, Radio-Block, Endkanal 3999), Pop-up-Kanäle (Book 6.9), Regionstiefe (Book 10.2); bei URL-Quellen zusätzlich ungültige PLZ (IT-5) und Conditional GET (IT-18) |
 | `cg` | Content-Guide-Endpunkte (TV-Anytime): Now/Next, Zeitfenster für jeden Tag von −7 bis +7, Programminfo; TVA-XSD; Pflichtfelder nach DTVP IT-6 (Tab. 41–64); Tagesabdeckung, Lücken, Überlappungen; Stichprobe der EPG-Bilder |
+| `ait` | XML-AITs der Linked Applications: Erreichbarkeit, Content-Type `application/vnd.dvb.ait+xml`, Struktur nach ETSI TS 102 809 (Namespace, orgId/appId, Anwendungstyp `application/vnd.hbbtv.xhtml+xml`, controlCode, mhpVersion, HTTP-Transport, applicationLocation), AUTOSTART bei Linked Apps, Erreichbarkeit der Einstiegsseite; optional XSD-Validierung mit `--ait-xsd` |
+| `mpd` | DASH-Manifeste: Erreichbarkeit, Antwortzeit, Content-Type, MPD-Struktur, DVB-DASH-Profil (DTVP IT-3), `type="dynamic"` mit `availabilityStartTime` und UTCTiming, Codecs, DRM, Mindestqualität für TV nach Book 7.3 (960×540, > 2,5 Mbit/s); HLS-Playlists auf Erreichbarkeit |
 | `images` | Logo-Endpunkte: Erreichbarkeit, Content-Type, Standardbreite 320 px, Dateigröße, Pflichtvarianten `16x9_colour`, `16x9_colour_light`, `16x9_colour_dark`, Transparenz, Breitenparameter `?w=` |
 
 ## Installation
@@ -46,6 +48,10 @@ dvbi-check run v6.xml --offline
 
 # Nur bestimmte Module
 dvbi-check run <URL> --modules cg,images
+dvbi-check run <URL> --modules ait,mpd
+
+# XML-AIT zusätzlich gegen das ETSI-Schema validieren
+dvbi-check run <URL> --modules ait --ait-xsd pfad/zu/mis_xmlait.xsd
 
 # Mit Konfigurationsdatei
 cp dvbi-check.example.toml dvbi-check.toml
@@ -94,7 +100,8 @@ werden dann als Warnung gemeldet, weil strikt validierende Clients die Liste abl
 - Sortierung innerhalb der Blöcke nach AGF-Daten, Genre oder Alphabet (Book 6.6)
 - Pop-up-Kontingente je Anbieter (Book 6.9, benötigt AGF-Marktanteile)
 - Inhaltliche Richtigkeit der Accessibility-Signalisierung (Book 15, DTVP IT-16)
-- Abspielbarkeit von DASH-Streams und HbbTV-Anwendungen
+- Abspielbarkeit von DASH-Streams (Segmente werden nicht geladen) und Funktion der HbbTV-Anwendungen
+- XML-AIT gegen das offizielle ETSI-Schema nur, wenn `mis_xmlait.xsd` über `--ait-xsd` angegeben wird
 
 ## Entwicklung
 
@@ -117,6 +124,6 @@ src/dvbi_check/
   sl.py             Zugriff auf die Service List
   httpclient.py     HTTP mit Cache, Retries, Zeitmessung
   resources.py      XSD/Classification Schemes (gepinnt)
-  checks/           schema, a177, profile_de, contentguide, images
+  checks/           schema, a177, profile_de, contentguide, images, ait, mpd
   report/           HTML (Jinja2), JSON, CSV
 ```

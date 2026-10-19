@@ -44,6 +44,7 @@ def build_parser() -> argparse.ArgumentParser:
                    help="erlaubter Content-Guide-Proxy-Host (mehrfach möglich)")
     r.add_argument("--resources-dir", help="Lokales dvb-i-tools-Verzeichnis (schemas/, res/)")
     r.add_argument("--offline", action="store_true", help="keine Netzwerkzugriffe (nur Schema, A177, Profil)")
+    r.add_argument("--ait-xsd", dest="ait_xsd", help="optional: XML-AIT-Schema (mis_xmlait.xsd, ETSI TS 102 809)")
     r.add_argument("--fail-on", choices=["error", "warning", "never"], default="error",
                    help="Exit-Code 1 bei Fehlern/Warnungen (für CI)")
     r.add_argument("-v", "--verbose", action="store_true")
@@ -79,7 +80,7 @@ def cmd_run(args) -> int:
     cfg = Config.load(args.config)
     cfg.update(**{k: getattr(args, k) for k in ("postcode", "user_agent", "timeout", "workers", "profile",
                                                  "cg_max_services", "cg_days_past", "cg_days_future",
-                                                 "cg_proxy_hosts")})
+                                                 "cg_proxy_hosts", "ait_xsd")})
     try:
         cfg.user_agent.encode("ascii")
     except UnicodeEncodeError:

@@ -70,6 +70,8 @@ MODULE_TITLES = {
     "profile": "DVB-I Book Germany & DTVP-Profil",
     "cg": "Content Guide & Now/Next (TV-Anytime)",
     "images": "Logo- und Image-Endpunkte",
+    "ait": "XML-AITs (Linked Applications)",
+    "mpd": "Stream-Manifeste (DASH-MPD)",
 }
 
 

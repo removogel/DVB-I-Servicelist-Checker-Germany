@@ -141,13 +141,39 @@ class TestFullRun(unittest.TestCase):
         self.assertIn("DE-LCN-7MAP", html)
 
 
+class TestAitMpd(TestFullRun):
+    """Nutzt denselben Komplettlauf; prüft die Module ait und mpd."""
+
+    def test_ait(self):
+        ait = self.rr.module("ait")
+        self.assertEqual(ait.stats["aits_checked"], 2)
+        ok = [f.code for f in ait.findings if f.subject == "Event-Kanal" and f.severity.name == "ERROR"]
+        self.assertEqual(ok, [], "gültiges AIT darf keine Fehler haben")
+        bad = {f.code for f in ait.findings if f.subject == "Ende der Liste"}
+        for c in ("AIT-CT", "AIT-ID", "AIT-TYPE", "AIT-TRANSPORT", "AIT-LOC", "AIT-AUTOSTART"):
+            self.assertIn(c, bad)
+        entry = ait.stats["aits"][0]["apps"] + ait.stats["aits"][1]["apps"]
+        self.assertTrue(any(a.get("entry_status") == 200 for a in entry))
+
+    def test_mpd(self):
+        mpd = self.rr.module("mpd")
+        by_svc = lambda name: {f.code for f in mpd.findings if f.subject == name}  # noqa: E731
+        self.assertFalse(by_svc("Eins") - {"MPD-HTTPS"}, "gültiges Live-MPD")
+        for c in ("MPD-PROFILE", "MPD-STATIC", "MPD-QUALITY", "MPD-BITRATE", "MPD-CT"):
+            self.assertIn(c, by_svc("ARD Nord"))
+        self.assertIn("MPD-HTTP", by_svc("ARD SWR"))
+        self.assertIn("MPD-NOVIDEO", by_svc("Radio Drei"))
+        self.assertEqual(mpd.stats["mpds_checked"], 4)
+
+
 class TestOffline(unittest.TestCase):
     def test_offline_skips_network_modules(self):
         res = resources_dir()
         rr = run(str(FIXTURE), Config(), offline=True,
                  resources_dir=None if res in (None, "MISSING") else res, allow_download=False)
         self.assertEqual(rr.module("cg").status, "skipped")
-        self.assertEqual(rr.module("images").status, "skipped")
+        for m in ("images", "ait", "mpd"):
+            self.assertEqual(rr.module(m).status, "skipped")
         self.assertNotEqual(rr.module("profile").status, "skipped")
 
 

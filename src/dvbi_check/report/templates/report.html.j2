@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DVB-I Readiness – {{ list.name }} v{{ list.version }}</title>
+<style>
+:root{
+  --bg:#f6f7f9;--panel:#fff;--ink:#14181f;--muted:#5d6675;--line:#e1e5eb;--soft:#eef1f5;
+  --err:#c4302b;--err-bg:#fdecea;--warn:#a76200;--warn-bg:#fff4e0;--ok:#1f7a4d;--ok-bg:#e6f4ec;
+  --info:#2f5fa7;--info-bg:#e8effa;--skip:#8a93a2;--accent:#1d4ed8;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#0f1217;--panel:#171b22;--ink:#e7eaf0;--muted:#9aa3b2;--line:#2a313c;--soft:#1f252e;
+  --err:#ff6b63;--err-bg:#3a1a19;--warn:#f0a83c;--warn-bg:#35270f;--ok:#4cc38a;--ok-bg:#12301f;
+  --info:#7aa7ff;--info-bg:#17243d;--skip:#6b7383;--accent:#7aa7ff;}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:1280px;margin:0 auto;padding:24px 16px 64px}
+h1{font-size:22px;margin:0 0 4px}h2{font-size:17px;margin:36px 0 12px}h3{font-size:15px;margin:20px 0 8px}
+.sub{color:var(--muted)}
+.mono{font-family:var(--mono);font-size:12.5px;word-break:break-all}
+header{display:flex;flex-wrap:wrap;gap:16px;justify-content:space-between;align-items:flex-end;border-bottom:1px solid var(--line);padding-bottom:16px}
+.meta{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;font-size:13px}
+.meta dt{color:var(--muted)}.meta dd{margin:0}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:20px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px}
+.kpi b{display:block;font-size:24px;line-height:1.2}
+.kpi span{color:var(--muted);font-size:12.5px}
+.kpi.err b{color:var(--err)}.kpi.warn b{color:var(--warn)}.kpi.ok b{color:var(--ok)}
+.bar{height:6px;background:var(--soft);border-radius:3px;margin-top:8px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--ok)}
+.mods{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.mod{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--skip);border-radius:8px;padding:12px 14px}
+.mod.error{border-left-color:var(--err)}.mod.warning{border-left-color:var(--warn)}.mod.ok{border-left-color:var(--ok)}
+.mod h3{margin:0 0 4px;font-size:14px}.mod .n{font-size:12.5px;color:var(--muted)}
+.mod .key{margin-top:6px;font-size:13px}
+.pill{display:inline-block;padding:1px 8px;border-radius:10px;font-size:12px;font-weight:600;white-space:nowrap}
+.pill.error,.pill.err{background:var(--err-bg);color:var(--err)}
+.pill.warning,.pill.warn{background:var(--warn-bg);color:var(--warn)}
+.pill.info{background:var(--info-bg);color:var(--info)}
+.pill.ok{background:var(--ok-bg);color:var(--ok)}
+.pill.skip,.pill.skipped{background:var(--soft);color:var(--skip)}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.scroll{overflow:auto;max-height:640px}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{padding:6px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+thead th{position:sticky;top:0;background:var(--soft);font-weight:600;z-index:1;white-space:nowrap}
+tbody tr:hover{background:var(--soft)}
+td.c{text-align:center}
+.dot{display:inline-block;width:12px;height:12px;border-radius:3px;background:var(--ok)}
+.dot.warn{background:var(--warn)}.dot.err{background:var(--err)}.dot.skip{background:var(--line)}
+.day{display:inline-block;width:16px;height:16px;border-radius:3px;margin:0 1px;background:var(--soft);vertical-align:middle}
+.day.full{background:var(--ok)}.day.part{background:var(--warn)}.day.none{background:var(--err)}.day.na{background:var(--line)}
+.day.today{outline:2px solid var(--accent);outline-offset:1px}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 12px}
+.toolbar input[type=search]{flex:1;min-width:220px;padding:7px 10px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink);font:inherit}
+.toolbar label{display:flex;gap:6px;align-items:center;padding:5px 10px;border:1px solid var(--line);border-radius:6px;background:var(--panel);cursor:pointer;user-select:none}
+details.grp{background:var(--panel);border:1px solid var(--line);border-radius:8px;margin:8px 0}
+details.grp>summary{list-style:none;cursor:pointer;padding:10px 14px;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+details.grp>summary::-webkit-details-marker{display:none}
+details.grp>summary .msg{flex:1;min-width:200px;font-weight:500}
+details.grp>summary .code{font-family:var(--mono);font-size:12px;color:var(--muted)}
+details.grp>summary .ref{font-size:12px;color:var(--muted)}
+details.grp>summary .cnt{font-variant-numeric:tabular-nums;color:var(--muted)}
+details.grp[open]>summary{border-bottom:1px solid var(--line)}
+details.grp table{font-size:12.5px}
+.hidden{display:none!important}
+nav.toc{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:16px;font-size:13px}
+nav.toc a{color:var(--accent);text-decoration:none}
+a{color:var(--accent)}
+footer{margin-top:48px;color:var(--muted);font-size:12.5px;border-top:1px solid var(--line);padding-top:12px}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:var(--muted);margin:6px 0 10px}
+.legend span{display:flex;gap:5px;align-items:center}
+tr.clickable{cursor:pointer}
+@media (max-width:640px){.meta{grid-template-columns:1fr}.meta dt{margin-top:6px}}
+</style>
+</head>
+<body>
+<main>
+<header>
+  <div>
+    <div class="sub">DVB-I Readiness Check</div>
+    <h1>{{ list.name or "Service List" }}</h1>
+    <div class="sub">{{ list.provider }} · Version {{ list.version }} · {{ list.revision }} · Profil {{ "DVB-I Book Germany / DTVP" if cfg.profile == "de" else "A177 Standard" }}</div>
+  </div>
+  <dl class="meta">
+    <dt>Quelle</dt><dd class="mono">{{ meta.source.request_url or meta.source.location }}</dd>
+    <dt>Listen-ID</dt><dd class="mono">{{ list.id }}</dd>
+    <dt>Geprüft</dt><dd>{{ started }} · {{ duration }} s · {{ meta.http_requests }} HTTP-Abrufe</dd>
+    <dt>Werkzeug</dt><dd>dvbi-check {{ meta.tool_version }}{% if meta.resources %} · Schemas {{ meta.resources.ref[:12] }}{% endif %}</dd>
+  </dl>
+</header>
+<nav class="toc">
+  <a href="#ueberblick">Überblick</a><a href="#services">Services</a>
+  {% if cg_rows %}<a href="#epg">EPG-Abdeckung</a>{% endif %}
+  {% if img_rows %}<a href="#logos">Logos</a>{% endif %}
+  <a href="#befunde">Befunde</a>
+</nav>
+
+<section id="ueberblick">
+<div class="kpis">
+  <div class="kpi {{ 'ok' if readiness == 100 else 'warn' if readiness >= 80 else 'err' }}">
+    <b>{{ svc_clean }} / {{ svc_total }}</b><span>Services ohne Fehler ({{ readiness }} %)</span>
+    <div class="bar"><i style="width:{{ readiness }}%"></i></div>
+  </div>
+  <div class="kpi err"><b>{{ counts.error }}</b><span>Fehler</span></div>
+  <div class="kpi warn"><b>{{ counts.warning }}</b><span>Warnungen</span></div>
+  <div class="kpi"><b>{{ counts.info }}</b><span>Hinweise</span></div>
+  <div class="kpi"><b>{{ list.services }}</b><span>Services in der Liste</span></div>
+</div>
+
+<h2>Module</h2>
+<div class="mods">
+{% for m in mods %}
+  <div class="mod {{ m.status }}">
+    <h3>{{ m.title }}</h3>
+    <div class="n">
+      {% if m.skipped %}<span class="pill skip">übersprungen</span> {{ m.skipped }}
+      {% else %}<span class="pill err">{{ m.count(3) }} Fehler</span> <span class="pill warn">{{ m.count(2) }} Warn.</span> <span class="pill info">{{ m.count(1) }} Info</span>{% endif %}
+    </div>
+    <div class="key">
+    {% if m.name == "schema" and m.stats.verdict %}{{ m.stats.verdict }}{% if m.stats.errors_standard %} · {{ m.stats.errors_standard }} Abweichung(en) vom Standardschema{% endif %}
+    {% elif m.name == "a177" and m.stats.services %}{{ m.stats.instances }} Instanzen · {{ m.stats.lcn_tables }} LCN-Tabellen · {{ m.stats.regions }} Regionen
+    {% elif m.name == "profile" and m.stats.lcn_distinct %}{{ m.stats.lcn_distinct }} LCNs · Referenz: {{ m.stats.reference_table }}
+    {% elif m.name == "cg" and m.stats.services_checked %}Now/Next ok: {{ m.stats.now_next_ok }}/{{ m.stats.services_checked }} · volle Vorschau: {{ m.stats.full_future_coverage }}/{{ m.stats.services_checked }}
+    {% elif m.name == "images" and m.stats.logos_checked %}{{ m.stats.logos_reachable }}/{{ m.stats.logos_checked }} erreichbar · {{ m.stats.width_ok }} mit Sollbreite · {{ m.stats.mandatory_variants_complete }} mit allen Pflichtvarianten
+    {% endif %}
+    </div>
+  </div>
+{% endfor %}
+</div>
+</section>
+
+<section id="services">
+<h2>Services</h2>
+<div class="toolbar"><input type="search" id="svcFilter" placeholder="Service, Anbieter oder ID filtern …"></div>
+<div class="legend"><span><i class="dot"></i> ohne Befund</span><span><i class="dot warn"></i> Warnung</span><span><i class="dot err"></i> Fehler</span><span><i class="dot skip"></i> nicht geprüft</span><span>Klick auf eine Zeile filtert die Befunde</span></div>
+<div class="panel scroll">
+<table id="svcTable">
+<thead><tr><th>LCN</th><th>Service</th><th>Anbieter</th><th>Typ</th>{% for m in mods %}<th class="c" title="{{ m.title }}">{{ {"schema":"Schema","a177":"A177","profile":"Profil","cg":"EPG","images":"Logo"}[m.name] }}</th>{% endfor %}<th class="c">Fehler</th></tr></thead>
+<tbody>
+{% for r in rows %}
+<tr class="clickable" data-uid="{{ r.uid }}" data-text="{{ (r.name ~ ' ' ~ r.provider ~ ' ' ~ r.uid)|lower }}">
+  <td>{% if r.lcn is not none %}{{ r.lcn }}{% if r.lcn_all|length > 1 %}<span class="sub"> +{{ r.lcn_all|length - 1 }}</span>{% endif %}{% if r.regional %}<span class="sub"> (reg.)</span>{% endif %}{% else %}–{% endif %}</td>
+  <td>{{ r.name }}<div class="mono sub">{{ r.uid }}</div></td>
+  <td>{{ r.provider }}</td><td>{{ r.type }}</td>
+  {% for c in r.cells %}<td class="c"><i class="dot {{ c }}"></i></td>{% endfor %}
+  <td class="c">{% if r.errors %}<span class="pill err">{{ r.errors }}</span>{% else %}–{% endif %}</td>
+</tr>
+{% endfor %}
+</tbody></table></div>
+</section>
+
+{% if cg_rows %}
+<section id="epg">
+<h2>EPG-Abdeckung</h2>
+<div class="legend"><span><i class="day full"></i> ≥ {{ (cfg.cg_min_coverage*100)|int }} % des Tages</span><span><i class="day part"></i> teilweise</span><span><i class="day none"></i> keine Daten</span><span><i class="day na"></i> Abruf fehlgeschlagen</span><span><i class="day today"></i> heute</span><span>Fenster {{ cg_days[0] }} … +{{ cg_days[-1] }} Tage</span></div>
+<div class="panel scroll">
+<table>
+<thead><tr><th>Service</th><th>Now/Next</th><th>Läuft gerade</th><th>Tage ({{ cg_days[0] }} … +{{ cg_days[-1] }})</th><th>Ø Abdeckung</th><th>Programminfo</th><th>Ø Antwort</th></tr></thead>
+<tbody>
+{% for s in cg_rows %}
+<tr>
+  <td>{{ s.name }}<div class="mono sub">sid {{ s.sid or "–" }}</div></td>
+  <td><span class="pill {{ 'ok' if s.now_next == 'ok' else 'err' if s.now_next in ('fehlerhaft','leer','keine Quelle') else 'warn' }}">{{ s.now_next or "–" }}</span></td>
+  <td>{{ s.now_title or "–" }}</td>
+  <td style="white-space:nowrap">{% for v in s.day_cells %}<i class="day {{ 'na' if v is none else 'full' if v >= cfg.cg_min_coverage else 'part' if v > 0 else 'none' }}{{ ' today' if cg_days[loop.index0] == 0 else '' }}" title="Tag {{ cg_days[loop.index0] }}: {{ v|pct }}"></i>{% endfor %}</td>
+  <td>{{ s.avg_coverage|pct }}</td>
+  <td>{{ s.program_info or "–" }}</td>
+  <td>{{ "%.2f s"|format(s.avg_response_s) if s.avg_response_s is not none else "–" }}</td>
+</tr>
+{% endfor %}
+</tbody></table></div>
+</section>
+{% endif %}
+
+{% if img_rows %}
+<section id="logos">
+<h2>Logos</h2>
+<div class="panel scroll">
+<table>
+<thead><tr><th>URL</th><th>HTTP</th><th>Typ</th><th>Größe</th><th>Gewicht</th>{% for v in cfg.logo_variants_mandatory %}<th>{{ v }}</th>{% endfor %}<th>?{{ cfg.image_width_param }}=</th></tr></thead>
+<tbody>
+{% for i in img_rows %}
+<tr>
+  <td class="mono"><a href="{{ i.url }}" target="_blank" rel="noopener">{{ i.url }}</a></td>
+  <td><span class="pill {{ 'ok' if i.status and 200 <= i.status < 300 else 'err' }}">{{ i.status or "–" }}</span></td>
+  <td>{{ i.content_type or "–" }}</td>
+  <td><span class="pill {{ 'ok' if i.width == cfg.logo_width else 'err' if i.width else 'skip' }}">{{ i.width ~ "×" ~ i.height if i.width else "–" }}</span></td>
+  <td><span class="pill {{ 'ok' if i.bytes <= cfg.logo_max_bytes else 'warn' }}">{{ (i.bytes / 1024)|round(1) }} kB</span></td>
+  {% for v in cfg.logo_variants_mandatory %}{% set st = i.variants.get(v, "–") %}<td><span class="pill {{ 'ok' if st.startswith('ok') else 'warn' if 'identisch' in st else 'err' if st != '–' else 'skip' }}">{{ st }}</span></td>{% endfor %}
+  <td>{{ i.width_param or "–" }}</td>
+</tr>
+{% endfor %}
+</tbody></table></div>
+</section>
+{% endif %}
+
+<section id="befunde">
+<h2>Befunde</h2>
+<div class="toolbar">
+  <input type="search" id="fFilter" placeholder="Befunde durchsuchen (Service, Code, Text) …">
+  <label><input type="checkbox" class="sevT" value="error" checked> Fehler</label>
+  <label><input type="checkbox" class="sevT" value="warning" checked> Warnungen</label>
+  <label><input type="checkbox" class="sevT" value="info"> Hinweise</label>
+  <label><input type="checkbox" id="expandAll"> alle aufklappen</label>
+</div>
+{% for m in mods %}
+<div class="modgroup">
+<h3>{{ m.title }}{% if m.skipped %} <span class="pill skip">übersprungen</span>{% endif %}</h3>
+{% if not groups[m.name] and not m.skipped %}<p class="sub">Keine Befunde.</p>{% endif %}
+{% for g in groups[m.name] %}
+<details class="grp" data-sev="{{ g.severity }}">
+  <summary><span class="pill {{ g.severity }}">{{ g.sev_label }}</span><span class="msg">{{ g.message }}</span><span class="code">{{ g.code }}</span>{% if g.ref %}<span class="ref">{{ g.ref }}</span>{% endif %}<span class="cnt">{{ g["items"]|length }}×</span></summary>
+  <div class="scroll" style="max-height:420px">
+  <table><thead><tr><th style="width:32%">Betrifft</th><th>Detail</th></tr></thead><tbody>
+  {% for it in g["items"] %}<tr data-text="{{ (it.subject ~ ' ' ~ it.detail ~ ' ' ~ it.service ~ ' ' ~ g.code ~ ' ' ~ g.message)|lower }}"><td>{{ it.subject or "–" }}{% if it.service %}<div class="mono sub">{{ it.service }}</div>{% endif %}</td><td class="mono">{{ it.detail }}</td></tr>{% endfor %}
+  </tbody></table></div>
+</details>
+{% endfor %}
+</div>
+{% endfor %}
+</section>
+
+<footer>
+  Grundlagen: DVB BlueBook A177r6 (ETSI TS 103 770 V1.2.1) · DVB-I Book Germany Ver. 1.0.1 · DTVP DVB-I Implementierungsprofil V1.0.1 ·
+  Schemas und Classification Schemes aus <a href="https://github.com/paulhiggs/dvb-i-tools">dvb-i-tools</a> (BSD-2-Clause){% if meta.resources %}, Stand {{ meta.resources.ref[:12] }}{% endif %}.
+  Nicht automatisch prüfbar: Sortierung nach AGF-Daten/Genre, Pop-up-Kontingente, inhaltliche Richtigkeit der Accessibility-Signalisierung.
+</footer>
+</main>
+<script>
+(function(){
+  const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
+  const svcF=$('#svcFilter');
+  svcF&&svcF.addEventListener('input',()=>{const q=svcF.value.toLowerCase().trim();
+    $$('#svcTable tbody tr').forEach(tr=>tr.classList.toggle('hidden',q&&!tr.dataset.text.includes(q)));});
+  const fF=$('#fFilter');
+  function apply(){
+    const q=(fF.value||'').toLowerCase().trim();
+    const sev=new Set($$('.sevT').filter(c=>c.checked).map(c=>c.value));
+    $$('details.grp').forEach(d=>{
+      let vis=0;
+      $$('tbody tr',d).forEach(tr=>{const on=!q||tr.dataset.text.includes(q);tr.classList.toggle('hidden',!on);if(on)vis++;});
+      const show=sev.has(d.dataset.sev)&&vis>0;
+      d.classList.toggle('hidden',!show);
+      if(q&&show)d.open=true;
+      const c=$('.cnt',d); if(c) c.textContent=(q?vis+' von '+$$('tbody tr',d).length:$$('tbody tr',d).length)+'×';
+    });
+  }
+  fF.addEventListener('input',apply);$$('.sevT').forEach(c=>c.addEventListener('change',apply));
+  $('#expandAll').addEventListener('change',e=>$$('details.grp:not(.hidden)').forEach(d=>d.open=e.target.checked));
+  $$('#svcTable tbody tr').forEach(tr=>tr.addEventListener('click',()=>{fF.value=tr.dataset.uid.toLowerCase();apply();
+    $('#befunde').scrollIntoView({behavior:'smooth'});}));
+  apply();
+})();
+</script>
+</body>
+</html>

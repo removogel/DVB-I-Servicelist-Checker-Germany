@@ -1,0 +1,42 @@
+# Beispielkonfiguration für dvbi-check
+# Verwendung: dvbi-check run <URL> --config dvbi-check.toml
+# Kommandozeilenoptionen überschreiben Werte aus dieser Datei.
+# Die Abschnitte dienen nur der Gliederung.
+
+[http]
+# The Service List liefert nur an zertifizierte Receiver aus (Book 11.1: User-Agent-Allowlist).
+# Hier den freigeschalteten User-Agent eintragen, sonst antwortet der Server mit 403.
+user_agent = "dvbi-check/0.1 (Readiness Check)"
+timeout = 10.0
+retries = 1
+workers = 8
+# postcode = "06217"          # serverseitige Regionalisierung (?postcode=)
+
+[profile]
+profile = "de"                 # "de" = DVB-I Book Germany + DTVP, "a177" = nur Standard
+# Hosts des Content-Guide-Proxys des Service List Providers (Book 12 / DTVP IT-17).
+# Ist die Liste leer, werden die Hosts nur aufgelistet, nicht bewertet.
+cg_proxy_hosts = []
+check_server_features = true   # ungültige PLZ (IT-5) und Conditional GET (IT-18) testen
+server_test_postcode = "10115"
+invalid_postcode = "00000"
+
+[contentguide]
+# cg_max_services = 20         # für schnelle Läufe nur die ersten N Services
+cg_days_past = 7               # DTVP IT-6: 7 Tage zurück "should"
+cg_days_future = 7             # DTVP IT-6: heute + 7 Tage "shall"
+cg_timezone = "Europe/Berlin"
+cg_min_coverage = 0.9
+cg_max_gap_minutes = 5
+cg_slow_seconds = 2.0
+cg_image_sample = 2
+
+[images]
+logo_width = 320               # DTVP IT-6 "shall"
+logo_max_bytes = 65536         # 64 kB, "should"
+epg_image_width = 640          # DTVP IT-6 "shall"
+epg_image_max_bytes = 102400   # 100 kB, "should"
+image_variant_param = "image_variant"
+image_width_param = "w"
+logo_variants_mandatory = ["16x9_colour", "16x9_colour_light", "16x9_colour_dark"]
+check_optional_variants = false

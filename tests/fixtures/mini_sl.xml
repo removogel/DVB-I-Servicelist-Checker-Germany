@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- © Testdaten für dvbi-check. Copyright: synthetisch, frei verwendbar. -->
+<ServiceList xmlns="urn:dvb:metadata:servicediscovery:2024" xmlns:tva="urn:tva:metadata:2024"
+  xmlns:dvbi-types="urn:dvb:metadata:servicediscovery-types:2023"
+  id="tag:example.org,2026:testliste" version="1" xml:lang="de">
+  <Name>Testliste</Name>
+  <ProviderName>Beispiel</ProviderName>
+  <RegionList version="1">
+    <Region countryCodes="DEU" regionID="de">
+      <RegionName>Deutschland</RegionName>
+      <Region regionID="de_sl">
+        <RegionName>Saarland</RegionName>
+        <PostcodeRange from="66001" to="66999"/>
+      </Region>
+      <Region regionID="de_rp">
+        <RegionName>Rheinland-Pfalz</RegionName>
+        <PostcodeRange from="66900" to="67999"/>
+      </Region>
+    </Region>
+  </RegionList>
+  <LCNTableList>
+    <LCNTable>
+      <TargetRegion>de</TargetRegion>
+      <LCN channelNumber="1" serviceRef="tag:example.org,2026:eins"/>
+      <LCN channelNumber="2" serviceRef="tag:example.org,2026:zwei-leer"/>
+      <LCN channelNumber="7" serviceRef="tag:ard.de,2021:nord"/>
+      <LCN channelNumber="44" serviceRef="tag:ard.de,2021:nord"/>
+      <LCN channelNumber="47" serviceRef="tag:ard.de,2021:sr"/>
+      <LCN channelNumber="48" serviceRef="tag:ard.de,2021:swr"/>
+      <LCN channelNumber="1500" serviceRef="tag:example.org,2026:popup"/>
+      <LCN channelNumber="2501" serviceRef="tag:example.org,2026:radio-luecke"/>
+      <LCN channelNumber="3999" serviceRef="tag:example.org,2026:end-of-service-list"/>
+    </LCNTable>
+    <LCNTable>
+      <TargetRegion>de_sl</TargetRegion>
+      <LCN channelNumber="1" serviceRef="tag:example.org,2026:eins"/>
+      <LCN channelNumber="7" serviceRef="tag:ard.de,2021:swr"/>
+      <LCN channelNumber="44" serviceRef="tag:ard.de,2021:nord"/>
+      <LCN channelNumber="48" serviceRef="tag:ard.de,2021:swr"/>
+      <LCN channelNumber="3999" serviceRef="tag:example.org,2026:end-of-service-list"/>
+    </LCNTable>
+  </LCNTableList>
+  <ContentGuideSourceList>
+    <ContentGuideSource CGSID="cg1">
+      <Name>Test-EPG</Name>
+      <ProviderName>Beispiel</ProviderName>
+      <ScheduleInfoEndpoint contentType="application/xml"><dvbi-types:URI>{BASE}/cg/schedule</dvbi-types:URI></ScheduleInfoEndpoint>
+      <ProgramInfoEndpoint contentType="application/xml"><dvbi-types:URI>{BASE}/cg/program</dvbi-types:URI></ProgramInfoEndpoint>
+    </ContentGuideSource>
+  </ContentGuideSourceList>
+  <Service version="1">
+    <UniqueIdentifier>tag:example.org,2026:eins</UniqueIdentifier>
+    <ServiceInstance priority="1">
+      <DisplayName>Eins HD</DisplayName>
+      <DVBSDeliveryParameters>
+        <DVBTriplet origNetId="1" tsId="1019" serviceId="10301"/>
+        <OrbitalPosition>19.2</OrbitalPosition>
+        <Frequency>11494000</Frequency>
+        <Polarization>horizontal</Polarization>
+        <SymbolRate>22000</SymbolRate>
+      </DVBSDeliveryParameters>
+    </ServiceInstance>
+    <ServiceInstance priority="2">
+      <DisplayName>Eins Stream</DisplayName>
+      <DASHDeliveryParameters>
+        <UriBasedLocation contentType="application/dash+xml"><dvbi-types:URI>https://stream.example.org/eins.mpd</dvbi-types:URI></UriBasedLocation>
+      </DASHDeliveryParameters>
+    </ServiceInstance>
+    <ServiceName>Eins</ServiceName>
+    <ProviderName>Beispiel</ProviderName>
+    <RelatedMaterial>
+      <tva:HowRelated href="urn:dvb:metadata:cs:HowRelatedCS:2021:1001.2"/>
+      <tva:MediaLocator><tva:MediaUri contentType="image/png">{BASE}/logo/ok.png</tva:MediaUri></tva:MediaLocator>
+    </RelatedMaterial>
+    <ServiceType href="urn:dvb:metadata:cs:ServiceTypeCS:2019:linear"/>
+    <ContentGuideSourceRef>cg1</ContentGuideSourceRef>
+    <ContentGuideServiceRef>tag:example.org,2026:eins</ContentGuideServiceRef>
+  </Service>
+  <Service version="1">
+    <UniqueIdentifier>tag:example.org,2026:zwei-leer</UniqueIdentifier>
+    <ServiceInstance priority="1">
+      <DVBSDeliveryParameters>
+        <DVBTriplet origNetId="1" tsId="1020" serviceId="10302"/>
+      </DVBSDeliveryParameters>
+    </ServiceInstance>
+    <ServiceName>Zwei</ServiceName>
+    <ProviderName>Beispiel</ProviderName>
+    <RelatedMaterial>
+      <tva:HowRelated href="urn:dvb:metadata:cs:HowRelatedCS:2021:1001.2"/>
+      <tva:MediaLocator><tva:MediaUri contentType="image/jpeg">{BASE}/logo/bad.png</tva:MediaUri></tva:MediaLocator>
+    </RelatedMaterial>
+    <ServiceType href="urn:dvb:metadata:cs:ServiceTypeCS:2019:linear"/>
+    <ContentGuideSourceRef>cg1</ContentGuideSourceRef>
+  </Service>
+  <Service version="1">
+    <UniqueIdentifier>tag:ard.de,2021:nord</UniqueIdentifier>
+    <ServiceInstance priority="1"><DisplayName>Nord</DisplayName>
+      <DASHDeliveryParameters><UriBasedLocation contentType="application/dash+xml"><dvbi-types:URI>https://stream.example.org/nord.mpd</dvbi-types:URI></UriBasedLocation></DASHDeliveryParameters>
+    </ServiceInstance>
+    <ServiceName>ARD Nord</ServiceName><ProviderName>ARD</ProviderName>
+    <ServiceType href="urn:dvb:metadata:cs:ServiceTypeCS:2019:linear"/>
+  </Service>
+  <Service version="1">
+    <UniqueIdentifier>tag:ard.de,2021:sr</UniqueIdentifier>
+    <ServiceInstance priority="1"><DisplayName>SR</DisplayName>
+      <DASHDeliveryParameters><UriBasedLocation contentType="application/dash+xml"><dvbi-types:URI>https://stream.example.org/sr.mpd</dvbi-types:URI></UriBasedLocation></DASHDeliveryParameters>
+    </ServiceInstance>
+    <ServiceName>ARD SR</ServiceName><ProviderName>ARD</ProviderName>
+    <ServiceType href="urn:dvb:metadata:cs:ServiceTypeCS:2019:linear"/>
+  </Service>
+  <Service version="1">
+    <UniqueIdentifier>tag:ard.de,2021:swr</UniqueIdentifier>
+    <ServiceInstance priority="1"><DisplayName>SWR</DisplayName>
+      <DASHDeliveryParameters><UriBasedLocation contentType="application/dash+xml"><dvbi-types:URI>https://stream.example.org/swr.mpd</dvbi-types:URI></UriBasedLocation></DASHDeliveryParameters>
+    </ServiceInstance>
+    <ServiceName>ARD SWR</ServiceName><ProviderName>ARD</ProviderName>
+    <ServiceType href="urn:dvb:metadata:cs:ServiceTypeCS:2019:linear"/>
+  </Service>
+  <Service version="1">
+    <UniqueIdentifier>tag:example.org,2026:popup</UniqueIdentifier>
+    <ServiceInstance priority="1"><DisplayName>Event</DisplayName>
+      <RelatedMaterial>
+        <tva:HowRelated href="urn:dvb:metadata:cs:LinkedApplicationCS:2019:1.2"/>
+        <tva:MediaLocator><tva:MediaUri contentType="application/vnd.dvb.ait+xml">https://app.example.org/event.aitx</tva:MediaUri></tva:MediaLocator>
+      </RelatedMaterial>
+    </ServiceInstance>
+    <ServiceName>Event-Kanal</ServiceName><ProviderName>Beispiel</ProviderName>
+    <ServiceType href="urn:dvb:metadata:cs:ServiceTypeCS:2019:linear"/>
+  </Service>
+  <Service version="1">
+    <UniqueIdentifier>tag:example.org,2026:radio-luecke</UniqueIdentifier>
+    <ServiceInstance priority="1"><DisplayName>Radio</DisplayName>
+      <DASHDeliveryParameters><UriBasedLocation contentType="application/dash+xml"><dvbi-types:URI>https://stream.example.org/radio.mpd</dvbi-types:URI></UriBasedLocation></DASHDeliveryParameters>
+    </ServiceInstance>
+    <ServiceName>Radio Drei</ServiceName><ProviderName>Beispiel</ProviderName>
+    <ServiceType href="urn:dvb:metadata:cs:ServiceTypeCS:2019:linear"/>
+    <ContentGuideSourceRef>cg1</ContentGuideSourceRef>
+    <ContentGuideServiceRef>tag:example.org,2026:radio-luecke</ContentGuideServiceRef>
+  </Service>
+  <Service version="1">
+    <UniqueIdentifier>tag:example.org,2026:end-of-service-list</UniqueIdentifier>
+    <ServiceInstance priority="1"><DisplayName>Ende</DisplayName>
+      <RelatedMaterial>
+        <tva:HowRelated href="urn:dvb:metadata:cs:LinkedApplicationCS:2019:1.2"/>
+        <tva:MediaLocator><tva:MediaUri contentType="application/vnd.dvb.ait+xml">https://app.example.org/end.aitx</tva:MediaUri></tva:MediaLocator>
+      </RelatedMaterial>
+    </ServiceInstance>
+    <ServiceName>Ende der Liste</ServiceName><ProviderName>Beispiel</ProviderName>
+  </Service>
+</ServiceList>

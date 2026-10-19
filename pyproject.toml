@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dvbi-check"
+version = "0.1.0"
+description = "Prüfwerkzeug für DVB-I Service Lists (A177r6) nach DVB-I Book Germany und DTVP-Implementierungsprofil"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "lxml>=5.0",
+    "requests>=2.31",
+    "Pillow>=10.0",
+    "Jinja2>=3.1",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[project.scripts]
+dvbi-check = "dvbi_check.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+dvbi_check = ["report/templates/*.j2"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

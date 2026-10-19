@@ -80,6 +80,13 @@ def cmd_run(args) -> int:
     cfg.update(**{k: getattr(args, k) for k in ("postcode", "user_agent", "timeout", "workers", "profile",
                                                  "cg_max_services", "cg_days_past", "cg_days_future",
                                                  "cg_proxy_hosts")})
+    try:
+        cfg.user_agent.encode("ascii")
+    except UnicodeEncodeError:
+        print(f"Ungültiger User-Agent {cfg.user_agent!r}: HTTP-Header dürfen nur ASCII-Zeichen enthalten "
+              "(z. B. kein „…“ oder Umlaut). Ohne --user-agent wird der Standard-User-Agent verwendet.",
+              file=sys.stderr)
+        return 2
     modules = [m.strip() for m in args.modules.split(",")] if args.modules else None
     if modules:
         bad = [m for m in modules if m not in ORDER]

@@ -121,6 +121,8 @@ fehlerhaftes AIT, statisches MPD mit zu geringer Qualität, nicht erreichbares M
   (`pattern_ard`, `pattern_rtl`, `pattern_sat1`); die Referenztabelle ist die LCNTable mit
   der obersten Region als TargetRegion.
 - **XML-AIT** wird strukturell geprüft; ein offizielles XSD ist optional (`--ait-xsd`).
+  Einstiegs-URLs der Apps per `http://` sind in der Praxis üblich und werden bewusst **nicht**
+  beanstandet (früherer Code `AIT-APP-HTTPS` entfällt). Geprüft wird nur ihre Erreichbarkeit.
 - **Nicht prüfbar**: Sortierung nach AGF/Genre/Alphabet, Pop-up-Kontingente,
   Richtigkeit der Accessibility-Signalisierung, Segment-Abspielbarkeit, Funktion der Apps.
 - **Schema-Ressourcen** sind auf `resources.PINNED_REF` festgelegt. Beim Aktualisieren

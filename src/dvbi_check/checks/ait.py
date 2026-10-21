@@ -164,8 +164,7 @@ def check_ait(ctx: Context, url: str, declared_ct: str, kinds: set) -> AitReport
         if base:
             entry = urljoin(base if base.endswith("/") else base + "/", loc or "")
             info["entry"] = entry
-            if entry.startswith("http://"):
-                rep.add("AIT-APP-HTTPS", Severity.WARNING, "Einstiegs-URL der Anwendung ohne HTTPS", detail=entry)
+            # HTTP-Einstiegs-URLs sind bei HbbTV-Apps üblich und werden bewusst nicht beanstandet.
             if cfg.ait_check_app_url and not ctx.offline:
                 ra = ctx.client.get(entry)
                 info["entry_status"] = ra.status

@@ -72,6 +72,7 @@ MODULE_TITLES = {
     "images": "Logo and image endpoints",
     "ait": "XML AITs (linked applications)",
     "mpd": "Stream manifests (DASH MPD)",
+    "refval": "DVB-I reference validator",
 }
 
 

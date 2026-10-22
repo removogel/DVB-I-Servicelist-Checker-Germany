@@ -70,7 +70,7 @@ class TestFullRun(unittest.TestCase):
         with MockServer() as m:
             sl = cls.tmp / "sl.xml"
             sl.write_text(FIXTURE.read_text(encoding="utf-8").replace("{BASE}", m.base), encoding="utf-8")
-            cfg = Config(cg_days_past=1, cg_days_future=2, workers=4)
+            cfg = Config(cg_days_past=1, cg_days_future=2, workers=4, refval_url=m.base)
             cls.rr = run(str(sl), cfg, resources_dir=None if res in (None, "MISSING") else res,
                          allow_download=False)
 
@@ -185,13 +185,28 @@ class TestAitMpd(TestFullRun):
         self.assertEqual(mpd.stats["mpds_checked"], 4)
 
 
+class TestRefVal(TestFullRun):
+    """Reference validator integration via its REST interface (mocked)."""
+
+    def test_refval(self):
+        rv = self.rr.module("refval")
+        self.assertEqual(rv.stats["http_status"], 200)
+        err = by_code(self.rr, "refval", "RV-SL999")[0]
+        self.assertEqual(err.severity.name, "ERROR")
+        self.assertEqual(err.service, "tag:example.org,2026:one")   # line number mapped back to the service
+        self.assertEqual(err.ref, "A177 table 15")
+        warn = by_code(self.rr, "refval", "RV-SL998")[0]
+        self.assertEqual(warn.severity.name, "INFO")                 # relaxed by the DE profile
+        self.assertIn("variants=DE", rv.stats["endpoint"])
+
+
 class TestOffline(unittest.TestCase):
     def test_offline_skips_network_modules(self):
         res = resources_dir()
         rr = run(str(FIXTURE), Config(), offline=True,
                  resources_dir=None if res in (None, "MISSING") else res, allow_download=False)
         self.assertEqual(rr.module("cg").status, "skipped")
-        for m in ("images", "ait", "mpd"):
+        for m in ("images", "ait", "mpd", "refval"):
             self.assertEqual(rr.module(m).status, "skipped")
         self.assertNotEqual(rr.module("profile").status, "skipped")
 

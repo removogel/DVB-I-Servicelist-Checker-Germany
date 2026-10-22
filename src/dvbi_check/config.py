@@ -65,6 +65,10 @@ class Config:
     mpd_slow_seconds: float = 2.0
     check_hls: bool = True                  # check HLS playlists (OtherDeliveryParameters) for reachability
 
+    # DVB-I reference validator (opt-in: sends the service list to this server)
+    refval_url: str | None = None           # e.g. "https://<host>:<port>" of a dvb-i-tools instance
+    refval_timeout: float = 300.0
+
     @classmethod
     def load(cls, path: str | Path | None) -> "Config":
         cfg = cls()

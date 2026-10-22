@@ -51,3 +51,9 @@ mpd_min_height = 540
 mpd_min_bandwidth = 2500000            # Book 7.3: > 2.5 Mbit/s
 mpd_slow_seconds = 2.0
 check_hls = true
+
+[refval]
+# DVB-I reference validator (paulhiggs/dvb-i-tools), opt-in.
+# The complete service list is POSTed to this server – only enable it if that is acceptable.
+# refval_url = "https://<host>:<port>"
+refval_timeout = 300.0

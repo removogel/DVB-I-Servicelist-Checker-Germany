@@ -51,6 +51,7 @@ checks/
   images.py       logos: width, size, image_variant, ?w=
   ait.py          XML AITs of linked applications
   mpd.py          DASH MPDs, HLS reachability
+  refval.py       optional: DVB-I reference validator via REST (POST, line → service mapping)
 report/           build_view() → Jinja2 template report.html.j2; JSON; CSV (; + BOM)
 ```
 
@@ -60,7 +61,7 @@ when `ctx.offline` is true and do nothing else.
 ## Conventions
 
 **Findings.** Every finding has a stable `code` with a module prefix (`SC`, `CS/HD/RG/CG/SV/SI/LC`,
-`DE-…`, `CG-…`, `IMG-…`, `AIT-…`, `MPD-…`/`HLS-…`). Do not rename codes – users filter and
+`DE-…`, `CG-…`, `IMG-…`, `AIT-…`, `MPD-…`/`HLS-…`, `RV-<validator code>`). Do not rename codes – users filter and
 compare reports by them. New rule = new code. Set `service=<UniqueIdentifier>` wherever
 possible so the finding shows up in the service matrix; context (date, URL, table) belongs in
 `detail`, **not** in `message`, otherwise grouping in the report falls apart.
@@ -109,7 +110,7 @@ Error cases deliberately covered by the fixture: regional programme on LCN 7 and
 block 41–49 (`DE-LCN-ARD7`), wrong regional programme on LCN 7 (`DE-LCN-7MAP`), service in the
 radio block without `linear-radio`, pop-up without out-of-service banner, DVB-S without tuning
 parameters, empty content guide, logo with wrong width and ignored variants, faulty AIT,
-static MPD with insufficient quality, unreachable MPD, misplaced `RelatedMaterial` (linked app
+static MPD with insufficient quality, unreachable MPD, reference validator findings (mocked), misplaced `RelatedMaterial` (linked app
 at list level, out-of-service banner in an instance, service logo in a content guide source,
 wrong HowRelatedCS version, invalid application contentType).
 
@@ -129,6 +130,10 @@ wrong HowRelatedCS version, invalid application contentType).
   location (A177 tables 14/15/16/20). Rules that depend on where something is signalled
   (`DE-BB`, `DE-POPUP-OOS`, list logo in `images`) only consider permitted locations.
 - **Scope**: this is not a full port of the reference validator; see README "Scope".
+- **Reference validator (`refval`)** is opt-in (`refval_url`), because it sends the whole list
+  to a third-party server. Its REST handler ignores `variants` (pinned source), so DE relaxations
+  are applied by dvbi-check (`DE_RELAXED` in `refval.py`). The mock in `tests/mockserver.py`
+  mimics `/validate_sl_json?results=all`; tests never call a real validator.
 - **Not checkable**: ordering by AGF/genre/alphabet, pop-up quotas, correctness of
   accessibility signalling, segment playability, functionality of apps.
 - **Schema resources** are pinned to `resources.PINNED_REF`. When updating, run the tests and

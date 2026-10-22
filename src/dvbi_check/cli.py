@@ -45,6 +45,8 @@ def build_parser() -> argparse.ArgumentParser:
                    help="permitted content guide proxy host (can be repeated)")
     r.add_argument("--resources-dir", help="local dvb-i-tools directory (schemas/, res/)")
     r.add_argument("--offline", action="store_true", help="no network access (schema, A177 and profile only)")
+    r.add_argument("--refval-url", dest="refval_url",
+                   help="base URL of a DVB-I reference validator (dvb-i-tools); the service list is POSTed there")
     r.add_argument("--ait-xsd", dest="ait_xsd", help="optional: XML AIT schema (mis_xmlait.xsd, ETSI TS 102 809)")
     r.add_argument("--fail-on", choices=["error", "warning", "never"], default="error",
                    help="exit code 1 on errors/warnings (for CI)")
@@ -81,7 +83,7 @@ def cmd_run(args) -> int:
     cfg = Config.load(args.config)
     cfg.update(**{k: getattr(args, k) for k in ("postcode", "user_agent", "timeout", "workers", "profile",
                                                  "cg_max_services", "cg_days_past", "cg_days_future",
-                                                 "cg_proxy_hosts", "ait_xsd")})
+                                                 "cg_proxy_hosts", "ait_xsd", "refval_url")})
     try:
         cfg.user_agent.encode("ascii")
     except UnicodeEncodeError:

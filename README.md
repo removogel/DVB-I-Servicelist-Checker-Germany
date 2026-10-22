@@ -12,6 +12,7 @@ It produces a report as HTML, JSON and CSV.
 | `cg` | Content guide endpoints (TV-Anytime): now/next, a time window for every day from −7 to +7, programme info; TVA XSD; mandatory fields according to DTVP IT-6 (tables 41–64); daily coverage, gaps, overlaps; sample of EPG images |
 | `ait` | XML AITs of linked applications: reachability, Content-Type `application/vnd.dvb.ait+xml`, structure according to ETSI TS 102 809 (namespace, orgId/appId, application type `application/vnd.hbbtv.xhtml+xml`, controlCode, mhpVersion, HTTP transport, applicationLocation), AUTOSTART for linked apps, reachability of the entry page; optional XSD validation with `--ait-xsd` |
 | `mpd` | DASH manifests: reachability, response time, Content-Type, MPD structure, DVB-DASH profile (DTVP IT-3), `type="dynamic"` with `availabilityStartTime` and UTCTiming, codecs, DRM, minimum quality for TV according to Book 7.3 (960×540, > 2.5 Mbit/s); HLS playlists for reachability |
+| `refval` | *Optional, opt-in.* Runs the [DVB-I reference validator](https://github.com/paulhiggs/dvb-i-tools) via its REST interface (`--refval-url`) and merges its findings (codes `RV-…`) into the report, mapped back to services |
 | `images` | Logo endpoints: reachability, Content-Type, default width 320 px, file size, mandatory variants `16x9_colour`, `16x9_colour_light`, `16x9_colour_dark`, transparency, width parameter `?w=` |
 
 ## Scope
@@ -20,7 +21,9 @@ It produces a report as HTML, JSON and CSV.
 and content of the referenced endpoints (content guide, logos, AITs, manifests). It is **not** a
 complete port of the [DVB-I reference validator](https://github.com/paulhiggs/dvb-i-tools),
 which covers further A177 details (e.g. accessibility attributes, signatures and digests, more
-cardinality rules). For a complete standard conformance check, run both tools.
+cardinality rules). For a complete standard conformance check, run both tools – or enable the
+`refval` module, which calls a running instance of the reference validator and includes its
+findings in the same report.
 
 ## Installation
 
@@ -63,6 +66,9 @@ dvbi-check run <URL> --modules ait,mpd
 # Additionally validate XML AITs against the ETSI schema
 dvbi-check run <URL> --modules ait --ait-xsd path/to/mis_xmlait.xsd
 
+# Include the DVB-I reference validator (sends the service list to that server!)
+dvbi-check run <URL> --refval-url https://<validator-host>:<port>
+
 # With a configuration file
 cp dvbi-check.example.toml dvbi-check.toml
 dvbi-check run <URL> --config dvbi-check.toml
@@ -104,6 +110,12 @@ schema are then reported as warnings, because strictly validating clients might 
   slot in block 41–49 was left empty.
 - ARD, RTL and SAT.1 are recognised for the Book 6.6 rules by configurable regular expressions
   (`pattern_ard`, `pattern_rtl`, `pattern_sat1`).
+- The `refval` module POSTs the already loaded list to `<refval_url>/validate_sl_json?results=all`
+  (so it also works for lists that are only delivered to whitelisted User-Agents). The list is
+  re-serialised with indentation so that the validator's line numbers can be mapped to services.
+  The REST interface validates against the standard schema; findings that the German profile
+  explicitly permits (DTVP IT-11/IT-12) are downgraded to info. The module is opt-in because it
+  sends the complete list to a third-party server.
 - HTTP entry URLs of HbbTV applications in XML AITs are common practice and are deliberately
   not flagged.
 

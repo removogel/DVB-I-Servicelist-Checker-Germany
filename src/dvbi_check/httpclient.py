@@ -102,3 +102,16 @@ class HttpClient:
                 if attempt < self.retries:
                     time.sleep(0.5 * (attempt + 1))
         return HttpResult(url, None, {}, b"", 0.0, last_err)
+
+    def post(self, url: str, data: bytes, content_type: str, timeout: float | None = None) -> HttpResult:
+        """Single POST without cache or retries (used for the reference validator)."""
+        t0 = time.perf_counter()
+        with self._lock:
+            self.request_count += 1
+        try:
+            r = self._session().post(url, data=data, headers={"Content-Type": content_type},
+                                     timeout=timeout or self.timeout, verify=self.verify)
+            return HttpResult(url, r.status_code, {k.lower(): v for k, v in r.headers.items()},
+                              r.content, time.perf_counter() - t0)
+        except requests.RequestException as e:
+            return HttpResult(url, None, {}, b"", time.perf_counter() - t0, f"{type(e).__name__}: {e}")

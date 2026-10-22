@@ -129,6 +129,7 @@ tr.clickable{cursor:pointer}
     {% elif m.name == "cg" and m.stats.services_checked %}Now/Next ok: {{ m.stats.now_next_ok }}/{{ m.stats.services_checked }} · full preview: {{ m.stats.full_future_coverage }}/{{ m.stats.services_checked }}
     {% elif m.name == "ait" and m.stats.aits_checked %}{{ m.stats.aits_reachable }}/{{ m.stats.aits_checked }} reachable · {{ m.stats.aits_without_errors }} without errors
     {% elif m.name == "mpd" and m.stats.mpds_checked %}{{ m.stats.mpds_reachable }}/{{ m.stats.mpds_checked }} MPDs reachable · {{ m.stats.mpds_without_errors }} without errors{% if m.stats.hls_checked %} · {{ m.stats.hls_checked }} HLS{% endif %}
+    {% elif m.name == "refval" and m.stats.http_status %}HTTP {{ m.stats.http_status }} · {{ m.stats.errors }} errors · {{ m.stats.warnings }} warnings{% if m.stats.downgraded %} · {{ m.stats.downgraded }} relaxed by DE profile{% endif %}
     {% elif m.name == "images" and m.stats.logos_checked %}{{ m.stats.logos_reachable }}/{{ m.stats.logos_checked }} reachable · {{ m.stats.width_ok }} with target width · {{ m.stats.mandatory_variants_complete }} with all mandatory variants
     {% endif %}
     </div>
@@ -143,7 +144,7 @@ tr.clickable{cursor:pointer}
 <div class="legend"><span><i class="dot"></i> no findings</span><span><i class="dot warn"></i> warning</span><span><i class="dot err"></i> error</span><span><i class="dot skip"></i> not checked</span><span>Click a row to filter the findings</span></div>
 <div class="panel scroll">
 <table id="svcTable">
-<thead><tr><th>LCN</th><th>Service</th><th>Provider</th><th>Type</th>{% for m in mods %}<th class="c" title="{{ m.title }}">{{ {"schema":"Schema","a177":"A177","profile":"Profile","cg":"EPG","images":"Logo","ait":"AIT","mpd":"MPD"}.get(m.name, m.name) }}</th>{% endfor %}<th class="c">Errors</th></tr></thead>
+<thead><tr><th>LCN</th><th>Service</th><th>Provider</th><th>Type</th>{% for m in mods %}<th class="c" title="{{ m.title }}">{{ {"schema":"Schema","a177":"A177","profile":"Profile","cg":"EPG","images":"Logo","ait":"AIT","mpd":"MPD","refval":"Ref."}.get(m.name, m.name) }}</th>{% endfor %}<th class="c">Errors</th></tr></thead>
 <tbody>
 {% for r in rows %}
 <tr class="clickable" data-uid="{{ r.uid }}" data-text="{{ (r.name ~ ' ' ~ r.provider ~ ' ' ~ r.uid)|lower }}">

@@ -1,4 +1,4 @@
-"""Laden der Service List aus Datei oder URL."""
+"""Loading the service list from a file or URL."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -26,7 +26,7 @@ def load(location: str, client: HttpClient, postcode: str | None = None) -> Sour
         url = add_query(location, postcode=postcode) if postcode else location
         r = client.get(url, use_cache=False)
         if not r.ok:
-            raise RuntimeError(f"Service List nicht abrufbar ({url}): {r.describe()}")
+            raise RuntimeError(f"Service list not retrievable ({url}): {r.describe()}")
         meta = {
             "status": r.status,
             "content_type": r.headers.get("content-type", ""),

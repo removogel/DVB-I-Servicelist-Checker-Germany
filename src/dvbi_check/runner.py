@@ -1,4 +1,4 @@
-"""Ablaufsteuerung: Liste laden, Module ausführen, Ergebnis zusammenstellen."""
+"""Orchestration: load the list, run the modules, assemble the result."""
 from __future__ import annotations
 
 import logging
@@ -47,14 +47,14 @@ def run(location: str, cfg: Config, modules: list[str] | None = None, resources_
     try:
         src = load(location, client, cfg.postcode)
     except Exception as e:  # noqa: BLE001
-        rr.fatal = f"Service List nicht ladbar: {e}"
+        rr.fatal = f"Service list could not be loaded: {e}"
         rr.finished = datetime.now(timezone.utc)
         return rr
     rr.meta["source"] = {"location": src.location, "request_url": src.request_url, **src.meta}
     try:
         doc = ServiceListDoc(src.data, src.location)
     except Exception as e:  # noqa: BLE001
-        rr.fatal = f"Service List nicht auswertbar: {e}"
+        rr.fatal = f"Service list could not be parsed: {e}"
         rr.finished = datetime.now(timezone.utc)
         return rr
     rr.doc = doc
@@ -68,12 +68,12 @@ def run(location: str, cfg: Config, modules: list[str] | None = None, resources_
         rr.meta["resources_error"] = str(e)
     ctx = Context(doc, src, cfg, client, rr.resources, offline)
     for name in [m for m in ORDER if not modules or m in modules]:
-        log.info("Prüfe %s …", name)
+        log.info("Checking %s …", name)
         try:
             rr.modules.append(get_runner(name)(ctx))
         except Exception as e:  # noqa: BLE001
-            log.exception("Modul %s abgebrochen", name)
-            rr.modules.append(ModuleResult(name, skipped=f"Abgebrochen: {type(e).__name__}: {e}"))
+            log.exception("Module %s aborted", name)
+            rr.modules.append(ModuleResult(name, skipped=f"Aborted: {type(e).__name__}: {e}"))
     rr.meta["http_requests"] = client.request_count
     rr.meta["tool_version"] = __version__
     rr.meta["resources"] = {"path": str(rr.resources.root), "ref": rr.resources.ref} if rr.resources else None

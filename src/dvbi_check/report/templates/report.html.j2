@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="de">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -83,53 +83,53 @@ tr.clickable{cursor:pointer}
   <div>
     <div class="sub">DVB-I Readiness Check</div>
     <h1>{{ list.name or "Service List" }}</h1>
-    <div class="sub">{{ list.provider }} · Version {{ list.version }} · {{ list.revision }} · Profil {{ "DVB-I Book Germany / DTVP" if cfg.profile == "de" else "A177 Standard" }}</div>
+    <div class="sub">{{ list.provider }} · version {{ list.version }} · {{ list.revision }} · profile {{ "DVB-I Book Germany / DTVP" if cfg.profile == "de" else "A177 standard" }}</div>
   </div>
   <dl class="meta">
-    <dt>Quelle</dt><dd class="mono">{{ meta.source.request_url or meta.source.location }}</dd>
-    <dt>Listen-ID</dt><dd class="mono">{{ list.id }}</dd>
-    <dt>Geprüft</dt><dd>{{ started }} · {{ duration }} s · {{ meta.http_requests }} HTTP-Abrufe</dd>
-    <dt>Werkzeug</dt><dd>dvbi-check {{ meta.tool_version }}{% if meta.resources %} · Schemas {{ meta.resources.ref[:12] }}{% endif %}</dd>
+    <dt>Source</dt><dd class="mono">{{ meta.source.request_url or meta.source.location }}</dd>
+    <dt>List ID</dt><dd class="mono">{{ list.id }}</dd>
+    <dt>Checked</dt><dd>{{ started }} · {{ duration }} s · {{ meta.http_requests }} HTTP requests</dd>
+    <dt>Tool</dt><dd>dvbi-check {{ meta.tool_version }}{% if meta.resources %} · Schemas {{ meta.resources.ref[:12] }}{% endif %}</dd>
   </dl>
 </header>
 <nav class="toc">
-  <a href="#ueberblick">Überblick</a><a href="#services">Services</a>
-  {% if cg_rows %}<a href="#epg">EPG-Abdeckung</a>{% endif %}
+  <a href="#overview">Overview</a><a href="#services">Services</a>
+  {% if cg_rows %}<a href="#epg">EPG coverage</a>{% endif %}
   {% if img_rows %}<a href="#logos">Logos</a>{% endif %}
   {% if ait_rows %}<a href="#aits">AITs</a>{% endif %}
-  {% if mpd_rows %}<a href="#manifeste">Manifeste</a>{% endif %}
-  <a href="#befunde">Befunde</a>
+  {% if mpd_rows %}<a href="#manifests">Manifests</a>{% endif %}
+  <a href="#findings">Findings</a>
 </nav>
 
-<section id="ueberblick">
+<section id="overview">
 <div class="kpis">
   <div class="kpi {{ 'ok' if readiness == 100 else 'warn' if readiness >= 80 else 'err' }}">
-    <b>{{ svc_clean }} / {{ svc_total }}</b><span>Services ohne Fehler ({{ readiness }} %)</span>
+    <b>{{ svc_clean }} / {{ svc_total }}</b><span>Services without errors ({{ readiness }}%)</span>
     <div class="bar"><i style="width:{{ readiness }}%"></i></div>
   </div>
-  <div class="kpi err"><b>{{ counts.error }}</b><span>Fehler</span></div>
-  <div class="kpi warn"><b>{{ counts.warning }}</b><span>Warnungen</span></div>
-  <div class="kpi"><b>{{ counts.info }}</b><span>Hinweise</span></div>
-  <div class="kpi"><b>{{ list.services }}</b><span>Services in der Liste</span></div>
+  <div class="kpi err"><b>{{ counts.error }}</b><span>Errors</span></div>
+  <div class="kpi warn"><b>{{ counts.warning }}</b><span>Warnings</span></div>
+  <div class="kpi"><b>{{ counts.info }}</b><span>Info</span></div>
+  <div class="kpi"><b>{{ list.services }}</b><span>Services in the list</span></div>
 </div>
 
-<h2>Module</h2>
+<h2>Modules</h2>
 <div class="mods">
 {% for m in mods %}
   <div class="mod {{ m.status }}">
     <h3>{{ m.title }}</h3>
     <div class="n">
-      {% if m.skipped %}<span class="pill skip">übersprungen</span> {{ m.skipped }}
-      {% else %}<span class="pill err">{{ m.count(3) }} Fehler</span> <span class="pill warn">{{ m.count(2) }} Warn.</span> <span class="pill info">{{ m.count(1) }} Info</span>{% endif %}
+      {% if m.skipped %}<span class="pill skip">skipped</span> {{ m.skipped }}
+      {% else %}<span class="pill err">{{ m.count(3) }} errors</span> <span class="pill warn">{{ m.count(2) }} warn.</span> <span class="pill info">{{ m.count(1) }} info</span>{% endif %}
     </div>
     <div class="key">
-    {% if m.name == "schema" and m.stats.verdict %}{{ m.stats.verdict }}{% if m.stats.errors_standard %} · {{ m.stats.errors_standard }} Abweichung(en) vom Standardschema{% endif %}
-    {% elif m.name == "a177" and m.stats.services %}{{ m.stats.instances }} Instanzen · {{ m.stats.lcn_tables }} LCN-Tabellen · {{ m.stats.regions }} Regionen
-    {% elif m.name == "profile" and m.stats.lcn_distinct %}{{ m.stats.lcn_distinct }} LCNs · Referenz: {{ m.stats.reference_table }}
-    {% elif m.name == "cg" and m.stats.services_checked %}Now/Next ok: {{ m.stats.now_next_ok }}/{{ m.stats.services_checked }} · volle Vorschau: {{ m.stats.full_future_coverage }}/{{ m.stats.services_checked }}
-    {% elif m.name == "ait" and m.stats.aits_checked %}{{ m.stats.aits_reachable }}/{{ m.stats.aits_checked }} erreichbar · {{ m.stats.aits_without_errors }} ohne Fehler
-    {% elif m.name == "mpd" and m.stats.mpds_checked %}{{ m.stats.mpds_reachable }}/{{ m.stats.mpds_checked }} MPDs erreichbar · {{ m.stats.mpds_without_errors }} ohne Fehler{% if m.stats.hls_checked %} · {{ m.stats.hls_checked }} HLS{% endif %}
-    {% elif m.name == "images" and m.stats.logos_checked %}{{ m.stats.logos_reachable }}/{{ m.stats.logos_checked }} erreichbar · {{ m.stats.width_ok }} mit Sollbreite · {{ m.stats.mandatory_variants_complete }} mit allen Pflichtvarianten
+    {% if m.name == "schema" and m.stats.verdict %}{{ m.stats.verdict }}{% if m.stats.errors_standard %} · {{ m.stats.errors_standard }} deviation(s) from the standard schema{% endif %}
+    {% elif m.name == "a177" and m.stats.services %}{{ m.stats.instances }} instances · {{ m.stats.lcn_tables }} LCN tables · {{ m.stats.regions }} regions
+    {% elif m.name == "profile" and m.stats.lcn_distinct %}{{ m.stats.lcn_distinct }} LCNs · reference: {{ m.stats.reference_table }}
+    {% elif m.name == "cg" and m.stats.services_checked %}Now/Next ok: {{ m.stats.now_next_ok }}/{{ m.stats.services_checked }} · full preview: {{ m.stats.full_future_coverage }}/{{ m.stats.services_checked }}
+    {% elif m.name == "ait" and m.stats.aits_checked %}{{ m.stats.aits_reachable }}/{{ m.stats.aits_checked }} reachable · {{ m.stats.aits_without_errors }} without errors
+    {% elif m.name == "mpd" and m.stats.mpds_checked %}{{ m.stats.mpds_reachable }}/{{ m.stats.mpds_checked }} MPDs reachable · {{ m.stats.mpds_without_errors }} without errors{% if m.stats.hls_checked %} · {{ m.stats.hls_checked }} HLS{% endif %}
+    {% elif m.name == "images" and m.stats.logos_checked %}{{ m.stats.logos_reachable }}/{{ m.stats.logos_checked }} reachable · {{ m.stats.width_ok }} with target width · {{ m.stats.mandatory_variants_complete }} with all mandatory variants
     {% endif %}
     </div>
   </div>
@@ -139,11 +139,11 @@ tr.clickable{cursor:pointer}
 
 <section id="services">
 <h2>Services</h2>
-<div class="toolbar"><input type="search" id="svcFilter" placeholder="Service, Anbieter oder ID filtern …"></div>
-<div class="legend"><span><i class="dot"></i> ohne Befund</span><span><i class="dot warn"></i> Warnung</span><span><i class="dot err"></i> Fehler</span><span><i class="dot skip"></i> nicht geprüft</span><span>Klick auf eine Zeile filtert die Befunde</span></div>
+<div class="toolbar"><input type="search" id="svcFilter" placeholder="Filter by service, provider or ID …"></div>
+<div class="legend"><span><i class="dot"></i> no findings</span><span><i class="dot warn"></i> warning</span><span><i class="dot err"></i> error</span><span><i class="dot skip"></i> not checked</span><span>Click a row to filter the findings</span></div>
 <div class="panel scroll">
 <table id="svcTable">
-<thead><tr><th>LCN</th><th>Service</th><th>Anbieter</th><th>Typ</th>{% for m in mods %}<th class="c" title="{{ m.title }}">{{ {"schema":"Schema","a177":"A177","profile":"Profil","cg":"EPG","images":"Logo","ait":"AIT","mpd":"MPD"}.get(m.name, m.name) }}</th>{% endfor %}<th class="c">Fehler</th></tr></thead>
+<thead><tr><th>LCN</th><th>Service</th><th>Provider</th><th>Type</th>{% for m in mods %}<th class="c" title="{{ m.title }}">{{ {"schema":"Schema","a177":"A177","profile":"Profile","cg":"EPG","images":"Logo","ait":"AIT","mpd":"MPD"}.get(m.name, m.name) }}</th>{% endfor %}<th class="c">Errors</th></tr></thead>
 <tbody>
 {% for r in rows %}
 <tr class="clickable" data-uid="{{ r.uid }}" data-text="{{ (r.name ~ ' ' ~ r.provider ~ ' ' ~ r.uid)|lower }}">
@@ -159,18 +159,18 @@ tr.clickable{cursor:pointer}
 
 {% if cg_rows %}
 <section id="epg">
-<h2>EPG-Abdeckung</h2>
-<div class="legend"><span><i class="day full"></i> ≥ {{ (cfg.cg_min_coverage*100)|int }} % des Tages</span><span><i class="day part"></i> teilweise</span><span><i class="day none"></i> keine Daten</span><span><i class="day na"></i> Abruf fehlgeschlagen</span><span><i class="day today"></i> heute</span><span>Fenster {{ cg_days[0] }} … +{{ cg_days[-1] }} Tage</span></div>
+<h2>EPG coverage</h2>
+<div class="legend"><span><i class="day full"></i> ≥ {{ (cfg.cg_min_coverage*100)|int }}% of the day</span><span><i class="day part"></i> partial</span><span><i class="day none"></i> no data</span><span><i class="day na"></i> request failed</span><span><i class="day today"></i> today</span><span>window {{ cg_days[0] }} … +{{ cg_days[-1] }} days</span></div>
 <div class="panel scroll">
 <table>
-<thead><tr><th>Service</th><th>Now/Next</th><th>Läuft gerade</th><th>Tage ({{ cg_days[0] }} … +{{ cg_days[-1] }})</th><th>Ø Abdeckung</th><th>Programminfo</th><th>Ø Antwort</th></tr></thead>
+<thead><tr><th>Service</th><th>Now/Next</th><th>On now</th><th>Days ({{ cg_days[0] }} … +{{ cg_days[-1] }})</th><th>Avg. coverage</th><th>Programme info</th><th>Avg. response</th></tr></thead>
 <tbody>
 {% for s in cg_rows %}
 <tr>
   <td>{{ s.name }}<div class="mono sub">sid {{ s.sid or "–" }}</div></td>
-  <td><span class="pill {{ 'ok' if s.now_next == 'ok' else 'err' if s.now_next in ('fehlerhaft','leer','keine Quelle') else 'warn' }}">{{ s.now_next or "–" }}</span></td>
+  <td><span class="pill {{ 'ok' if s.now_next == 'ok' else 'err' if s.now_next in ('failed','empty','no source') else 'warn' }}">{{ s.now_next or "–" }}</span></td>
   <td>{{ s.now_title or "–" }}</td>
-  <td style="white-space:nowrap">{% for v in s.day_cells %}<i class="day {{ 'na' if v is none else 'full' if v >= cfg.cg_min_coverage else 'part' if v > 0 else 'none' }}{{ ' today' if cg_days[loop.index0] == 0 else '' }}" title="Tag {{ cg_days[loop.index0] }}: {{ v|pct }}"></i>{% endfor %}</td>
+  <td style="white-space:nowrap">{% for v in s.day_cells %}<i class="day {{ 'na' if v is none else 'full' if v >= cfg.cg_min_coverage else 'part' if v > 0 else 'none' }}{{ ' today' if cg_days[loop.index0] == 0 else '' }}" title="Day {{ cg_days[loop.index0] }}: {{ v|pct }}"></i>{% endfor %}</td>
   <td>{{ s.avg_coverage|pct }}</td>
   <td>{{ s.program_info or "–" }}</td>
   <td>{{ "%.2f s"|format(s.avg_response_s) if s.avg_response_s is not none else "–" }}</td>
@@ -185,7 +185,7 @@ tr.clickable{cursor:pointer}
 <h2>Logos</h2>
 <div class="panel scroll">
 <table>
-<thead><tr><th>URL</th><th>HTTP</th><th>Typ</th><th>Größe</th><th>Gewicht</th>{% for v in cfg.logo_variants_mandatory %}<th>{{ v }}</th>{% endfor %}<th>?{{ cfg.image_width_param }}=</th></tr></thead>
+<thead><tr><th>URL</th><th>HTTP</th><th>Type</th><th>Dimensions</th><th>File size</th>{% for v in cfg.logo_variants_mandatory %}<th>{{ v }}</th>{% endfor %}<th>?{{ cfg.image_width_param }}=</th></tr></thead>
 <tbody>
 {% for i in img_rows %}
 <tr>
@@ -194,7 +194,7 @@ tr.clickable{cursor:pointer}
   <td>{{ i.content_type or "–" }}</td>
   <td><span class="pill {{ 'ok' if i.width == cfg.logo_width else 'err' if i.width else 'skip' }}">{{ i.width ~ "×" ~ i.height if i.width else "–" }}</span></td>
   <td><span class="pill {{ 'ok' if i.bytes <= cfg.logo_max_bytes else 'warn' }}">{{ (i.bytes / 1024)|round(1) }} kB</span></td>
-  {% for v in cfg.logo_variants_mandatory %}{% set st = i.variants.get(v, "–") %}<td><span class="pill {{ 'ok' if st.startswith('ok') else 'warn' if 'identisch' in st else 'err' if st != '–' else 'skip' }}">{{ st }}</span></td>{% endfor %}
+  {% for v in cfg.logo_variants_mandatory %}{% set st = i.variants.get(v, "–") %}<td><span class="pill {{ 'ok' if st.startswith('ok') else 'warn' if 'same as default' in st else 'err' if st != '–' else 'skip' }}">{{ st }}</span></td>{% endfor %}
   <td>{{ i.width_param or "–" }}</td>
 </tr>
 {% endfor %}
@@ -204,10 +204,10 @@ tr.clickable{cursor:pointer}
 
 {% if ait_rows %}
 <section id="aits">
-<h2>XML-AITs</h2>
+<h2>XML AITs</h2>
 <div class="panel scroll">
 <table>
-<thead><tr><th>URL</th><th>HTTP</th><th>Content-Type</th><th>Typ</th><th>Anwendungen</th><th>Befunde</th></tr></thead>
+<thead><tr><th>URL</th><th>HTTP</th><th>Content-Type</th><th>Type</th><th>Applications</th><th>Findings</th></tr></thead>
 <tbody>
 {% for a in ait_rows %}
 <tr>
@@ -215,7 +215,7 @@ tr.clickable{cursor:pointer}
   <td><span class="pill {{ 'ok' if a.status and 200 <= a.status < 300 else 'err' }}">{{ a.status or "–" }}</span></td>
   <td><span class="pill {{ 'ok' if a.content_type == 'application/vnd.dvb.ait+xml' else 'warn' }}">{{ a.content_type or "–" }}</span></td>
   <td>{{ a.kinds|join(", ") }}</td>
-  <td>{% for ap in a.apps %}<div>{{ ap.name or "(ohne Name)" }} <span class="sub">{{ ap.controlCode or "–" }}{% if ap.version %} · HbbTV {{ ap.version }}{% endif %}{% if ap.entry_status %} · Einstieg {{ ap.entry_status }}{% endif %}</span></div>{% else %}–{% endfor %}</td>
+  <td>{% for ap in a.apps %}<div>{{ ap.name or "(no name)" }} <span class="sub">{{ ap.controlCode or "–" }}{% if ap.version %} · HbbTV {{ ap.version }}{% endif %}{% if ap.entry_status %} · entry {{ ap.entry_status }}{% endif %}</span></div>{% else %}–{% endfor %}</td>
   <td>{% if a.issues %}<span class="pill warn">{{ a.issues }}</span>{% else %}<span class="pill ok">0</span>{% endif %}</td>
 </tr>
 {% endfor %}
@@ -224,11 +224,11 @@ tr.clickable{cursor:pointer}
 {% endif %}
 
 {% if mpd_rows %}
-<section id="manifeste">
-<h2>Stream-Manifeste</h2>
+<section id="manifests">
+<h2>Stream manifests</h2>
 <div class="panel scroll">
 <table>
-<thead><tr><th>URL</th><th>Art</th><th>HTTP</th><th>Typ</th><th>Max. Video</th><th>Codecs</th><th>DRM</th><th>Antwort</th><th>Befunde</th></tr></thead>
+<thead><tr><th>URL</th><th>Kind</th><th>HTTP</th><th>Type</th><th>Max. video</th><th>Codecs</th><th>DRM</th><th>Response</th><th>Findings</th></tr></thead>
 <tbody>
 {% for d in mpd_rows %}
 <tr>
@@ -247,24 +247,24 @@ tr.clickable{cursor:pointer}
 </section>
 {% endif %}
 
-<section id="befunde">
-<h2>Befunde</h2>
+<section id="findings">
+<h2>Findings</h2>
 <div class="toolbar">
-  <input type="search" id="fFilter" placeholder="Befunde durchsuchen (Service, Code, Text) …">
-  <label><input type="checkbox" class="sevT" value="error" checked> Fehler</label>
-  <label><input type="checkbox" class="sevT" value="warning" checked> Warnungen</label>
-  <label><input type="checkbox" class="sevT" value="info"> Hinweise</label>
-  <label><input type="checkbox" id="expandAll"> alle aufklappen</label>
+  <input type="search" id="fFilter" placeholder="Search findings (service, code, text) …">
+  <label><input type="checkbox" class="sevT" value="error" checked> Errors</label>
+  <label><input type="checkbox" class="sevT" value="warning" checked> Warnings</label>
+  <label><input type="checkbox" class="sevT" value="info"> Info</label>
+  <label><input type="checkbox" id="expandAll"> expand all</label>
 </div>
 {% for m in mods %}
 <div class="modgroup">
-<h3>{{ m.title }}{% if m.skipped %} <span class="pill skip">übersprungen</span>{% endif %}</h3>
-{% if not groups[m.name] and not m.skipped %}<p class="sub">Keine Befunde.</p>{% endif %}
+<h3>{{ m.title }}{% if m.skipped %} <span class="pill skip">skipped</span>{% endif %}</h3>
+{% if not groups[m.name] and not m.skipped %}<p class="sub">No findings.</p>{% endif %}
 {% for g in groups[m.name] %}
 <details class="grp" data-sev="{{ g.severity }}">
   <summary><span class="pill {{ g.severity }}">{{ g.sev_label }}</span><span class="msg">{{ g.message }}</span><span class="code">{{ g.code }}</span>{% if g.ref %}<span class="ref">{{ g.ref }}</span>{% endif %}<span class="cnt">{{ g["items"]|length }}×</span></summary>
   <div class="scroll" style="max-height:420px">
-  <table><thead><tr><th style="width:32%">Betrifft</th><th>Detail</th></tr></thead><tbody>
+  <table><thead><tr><th style="width:32%">Subject</th><th>Detail</th></tr></thead><tbody>
   {% for it in g["items"] %}<tr data-text="{{ (it.subject ~ ' ' ~ it.detail ~ ' ' ~ it.service ~ ' ' ~ g.code ~ ' ' ~ g.message)|lower }}"><td>{{ it.subject or "–" }}{% if it.service %}<div class="mono sub">{{ it.service }}</div>{% endif %}</td><td class="mono">{{ it.detail }}</td></tr>{% endfor %}
   </tbody></table></div>
 </details>
@@ -274,9 +274,9 @@ tr.clickable{cursor:pointer}
 </section>
 
 <footer>
-  Grundlagen: DVB BlueBook A177r6 (ETSI TS 103 770 V1.2.1) · DVB-I Book Germany Ver. 1.0.1 · DTVP DVB-I Implementierungsprofil V1.0.1 ·
-  Schemas und Classification Schemes aus <a href="https://github.com/paulhiggs/dvb-i-tools">dvb-i-tools</a> (BSD-2-Clause){% if meta.resources %}, Stand {{ meta.resources.ref[:12] }}{% endif %}.
-  Nicht automatisch prüfbar: Sortierung nach AGF-Daten/Genre, Pop-up-Kontingente, inhaltliche Richtigkeit der Accessibility-Signalisierung.
+  Basis: DVB BlueBook A177r6 (ETSI TS 103 770 V1.2.1) · DVB-I Book Germany ver. 1.0.1 · DTVP DVB-I implementation profile V1.0.1 ·
+  Schemas and classification schemes from <a href="https://github.com/paulhiggs/dvb-i-tools">dvb-i-tools</a> (BSD-2-Clause){% if meta.resources %}, revision {{ meta.resources.ref[:12] }}{% endif %}.
+  Not checked automatically: ordering by AGF data/genre, pop-up quotas, correctness of accessibility signalling.
 </footer>
 </main>
 <script>
@@ -295,13 +295,13 @@ tr.clickable{cursor:pointer}
       const show=sev.has(d.dataset.sev)&&vis>0;
       d.classList.toggle('hidden',!show);
       if(q&&show)d.open=true;
-      const c=$('.cnt',d); if(c) c.textContent=(q?vis+' von '+$$('tbody tr',d).length:$$('tbody tr',d).length)+'×';
+      const c=$('.cnt',d); if(c) c.textContent=(q?vis+' of '+$$('tbody tr',d).length:$$('tbody tr',d).length)+'×';
     });
   }
   fF.addEventListener('input',apply);$$('.sevT').forEach(c=>c.addEventListener('change',apply));
   $('#expandAll').addEventListener('change',e=>$$('details.grp:not(.hidden)').forEach(d=>d.open=e.target.checked));
   $$('#svcTable tbody tr').forEach(tr=>tr.addEventListener('click',()=>{fF.value=tr.dataset.uid.toLowerCase();apply();
-    $('#befunde').scrollIntoView({behavior:'smooth'});}));
+    $('#findings').scrollIntoView({behavior:'smooth'});}));
   apply();
 })();
 </script>

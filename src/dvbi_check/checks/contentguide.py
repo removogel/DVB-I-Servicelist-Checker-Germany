@@ -1,10 +1,10 @@
-"""Prüfung der Content-Guide-Endpunkte (TV-Anytime): Now/Next, Zeitfenster, Programminformation.
+"""Checks of the content guide endpoints (TV-Anytime): now/next, time windows, programme information.
 
-Abfragen nach A177 Kap. 6 (wie im DVB-I-Referenzvalidator):
+Requests per A177 clause 6 (as in the DVB-I reference validator):
   ScheduleInfoEndpoint?sid=<id>&now_next=true
   ScheduleInfoEndpoint?sid=<id>&start=<epoch>&end=<epoch>
   ProgramInfoEndpoint?pid=<crid>
-Inhaltliche Anforderungen: DTVP IT-6 (Content Guide Metadata, Tabellen 41–64).
+Content requirements: DTVP IT-6 (content guide metadata, tables 41–64).
 """
 from __future__ import annotations
 
@@ -28,7 +28,7 @@ NOW_CRID = "crid://dvb.org/metadata/schedules/now-next/now"
 LATER_CRID = "crid://dvb.org/metadata/schedules/now-next/later"
 DUR_RE = re.compile(r"^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?)?$")
 REF = "DTVP IT-6 (Content Guide Metadata)"
-WEEKDAYS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"]
+WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
 
 # ------------------------------------------------------------------ helpers
@@ -87,7 +87,7 @@ class TvaDoc:
 
 
 class ServiceCG:
-    """Sammelt Befunde eines Service und fasst gleichartige Mängel zusammen."""
+    """Collects a service's findings and aggregates issues of the same kind."""
 
     def __init__(self, svc: Service):
         self.svc = svc
@@ -107,20 +107,20 @@ def fetch_tva(ctx: Context, sc: ServiceCG, url: str, label: str, where: str = ""
     sc.stats["requests"] += 1
     sc.stats.setdefault("response_times", []).append(round(r.elapsed, 3))
     if not r.ok:
-        sc.add("CG-HTTP", Severity.ERROR, f"{label}: Endpunkt antwortet nicht erfolgreich", detail=f"{pre}{r.describe()} · {url}")
+        sc.add("CG-HTTP", Severity.ERROR, f"{label}: endpoint does not respond successfully", detail=f"{pre}{r.describe()} · {url}")
         return None
     if r.elapsed > ctx.cfg.cg_slow_seconds:
         sc.counters[("CG-SLOW", label)] += 1
     if "xml" not in r.content_type:
-        sc.add("CG-CT", Severity.WARNING, f"{label}: Content-Type ist kein XML", detail=f"{pre}{r.content_type} · {url}")
+        sc.add("CG-CT", Severity.WARNING, f"{label}: Content-Type is not XML", detail=f"{pre}{r.content_type} · {url}")
     try:
         root = etree.fromstring(r.content, etree.XMLParser(no_network=True, resolve_entities=False, huge_tree=True))
     except etree.XMLSyntaxError as e:
-        sc.add("CG-XML", Severity.ERROR, f"{label}: Antwort ist kein wohlgeformtes XML", detail=f"{pre}{e} · {url}")
+        sc.add("CG-XML", Severity.ERROR, f"{label}: response is not well-formed XML", detail=f"{pre}{e} · {url}")
         return None
     q = etree.QName(root)
     if q.localname != "TVAMain" or not (q.namespace or "").startswith(TVA_PREFIX):
-        sc.add("CG-ROOT", Severity.ERROR, f"{label}: Root-Element ist nicht TVAMain (TV-Anytime)",
+        sc.add("CG-ROOT", Severity.ERROR, f"{label}: root element is not TVAMain (TV-Anytime)",
                detail=f"{pre}{root.tag} · {url}")
         return None
     doc = TvaDoc(root, q.namespace)
@@ -128,13 +128,13 @@ def fetch_tva(ctx: Context, sc: ServiceCG, url: str, label: str, where: str = ""
     if ctx.res is not None:
         xsd = ctx.res.tva_schema_file(q.namespace.rsplit(":", 1)[-1])
         if xsd is None:
-            sc.add("CG-XSD", Severity.WARNING, f"{label}: Kein TVA-Schema für {q.namespace}", detail=url)
+            sc.add("CG-XSD", Severity.WARNING, f"{label}: no TVA schema for {q.namespace}", detail=url)
         else:
             schema = load_schema(str(xsd))
             if not schema.validate(root.getroottree()):
                 msgs = Counter(re.sub(r"\{[^}]*\}", "", e.message) for e in schema.error_log)
                 for m, n in list(msgs.items())[:3]:
-                    sc.add("CG-XSD", Severity.ERROR, f"{label}: Schemafehler (TV-Anytime)",
+                    sc.add("CG-XSD", Severity.ERROR, f"{label}: schema error (TV-Anytime)",
                            ref=f"TVA {xsd.name}", detail=f"{pre}{m} ({n}×) · {url}")
     pd = kid(root, "ProgramDescription")
     for pi in kids(kid(pd, "ProgramInformationTable"), "ProgramInformation"):
@@ -156,7 +156,7 @@ def events_of(schedule) -> list[Event]:
 
 
 def check_program_info(sc: ServiceCG, pi, where: str) -> list[str]:
-    """Prüft ProgramInformation (Tab. 41–43) und liefert Bild-URLs."""
+    """Checks ProgramInformation (tables 41–43) and returns image URLs."""
     bd = kid(pi, "BasicDescription")
     if bd is None:
         sc.counters[("CG-PI-BD", where)] += 1
@@ -188,46 +188,46 @@ def check_now_next(ctx, sc, ep, sid, now) -> tuple[list[str], list]:
     url = add_query(ep, sid=sid, now_next="true")
     doc = fetch_tva(ctx, sc, url, "Now/Next")
     if doc is None:
-        sc.stats["now_next"] = "fehlerhaft"
+        sc.stats["now_next"] = "failed"
         return [], []
     groups = {g.get("groupId"): g for g in doc.groups}
     if not doc.groups:
-        sc.add("CG-NN-GROUP", Severity.ERROR, "Now/Next: GroupInformationTable fehlt", detail=url)
+        sc.add("CG-NN-GROUP", Severity.ERROR, "Now/Next: GroupInformationTable missing", detail=url)
     for crid in (NOW_CRID, LATER_CRID):
         g = groups.get(crid)
         if doc.groups and g is None:
-            sc.add("CG-NN-GROUP", Severity.WARNING, f"Now/Next: GroupInformation {crid.rsplit('/', 1)[-1]} fehlt", detail=url)
+            sc.add("CG-NN-GROUP", Severity.WARNING, f"Now/Next: GroupInformation {crid.rsplit('/', 1)[-1]} missing", detail=url)
         elif g is not None:
             for a in ("ordered", "numOfItems"):
                 if g.get(a) is None:
-                    sc.add("CG-NN-GROUP", Severity.ERROR, f"Now/Next: GroupInformation@{a} fehlt",
-                           ref="DTVP IT-6 (Tab. 64)", detail=crid)
+                    sc.add("CG-NN-GROUP", Severity.ERROR, f"Now/Next: GroupInformation@{a} missing",
+                           ref="DTVP IT-6 (table 64)", detail=crid)
             if kid(g, "GroupType") is None or kid(g, "BasicDescription") is None:
-                sc.add("CG-NN-GROUP", Severity.ERROR, "Now/Next: GroupType/BasicDescription fehlt",
-                       ref="DTVP IT-6 (Tab. 64)", detail=crid)
+                sc.add("CG-NN-GROUP", Severity.ERROR, "Now/Next: GroupType/BasicDescription missing",
+                       ref="DTVP IT-6 (table 64)", detail=crid)
             n = g.get("numOfItems")
             if n is not None and (not n.isdigit() or not 0 < int(n) <= 1):
-                sc.add("CG-NN-GROUP", Severity.ERROR, "Now/Next: numOfItems muss 1 sein", detail=f"{crid} = {n}")
+                sc.add("CG-NN-GROUP", Severity.ERROR, "Now/Next: numOfItems must be 1", detail=f"{crid} = {n}")
     for g in doc.groups:
         if g.get("groupId") not in (NOW_CRID, LATER_CRID):
-            sc.add("CG-NN-GROUP", Severity.WARNING, "Now/Next: unerwartete GroupInformation", detail=g.get("groupId"))
+            sc.add("CG-NN-GROUP", Severity.WARNING, "Now/Next: unexpected GroupInformation", detail=g.get("groupId"))
     events = []
     for s in doc.schedules:
         if s.get("serviceIDRef") != sid:
-            sc.add("CG-SID", Severity.ERROR, "Now/Next: Schedule@serviceIDRef passt nicht zur angefragten sid",
+            sc.add("CG-SID", Severity.ERROR, "Now/Next: Schedule@serviceIDRef does not match the requested sid",
                    detail=f"{s.get('serviceIDRef')} ≠ {sid}")
         events += events_of(s)
     if not events:
-        sc.add("CG-NN-EMPTY", Severity.ERROR, "Now/Next: keine Events geliefert", detail=url)
-        sc.stats["now_next"] = "leer"
+        sc.add("CG-NN-EMPTY", Severity.ERROR, "Now/Next: no events returned", detail=url)
+        sc.stats["now_next"] = "empty"
         return [], []
     if len(events) > 2:
-        sc.add("CG-NN-COUNT", Severity.WARNING, f"Now/Next: {len(events)} Events statt höchstens 2", detail=url)
+        sc.add("CG-NN-COUNT", Severity.WARNING, f"Now/Next: {len(events)} events instead of at most 2", detail=url)
     running = [e for e in events if e.start and e.end and e.start <= now < e.end]
     if not running:
-        sc.add("CG-NN-NOW", Severity.WARNING, "Now/Next: kein Event deckt die aktuelle Uhrzeit ab",
+        sc.add("CG-NN-NOW", Severity.WARNING, "Now/Next: no event covers the current time",
                detail=", ".join(f"{e.start:%H:%M}–{e.end:%H:%M}" for e in events if e.start and e.end) + f" · {url}")
-    sc.stats["now_next"] = "ok" if running else "ohne laufendes Event"
+    sc.stats["now_next"] = "ok" if running else "no current event"
     sc.stats["now_title"] = None
     images = []
     for e in events:
@@ -258,8 +258,8 @@ def _event_fields(sc: ServiceCG, e: Event, where: str) -> None:
 def check_schedule_day(ctx, sc, ep, sid, day_start: datetime, offset: int) -> tuple[list[str], list]:
     day_end = day_start + timedelta(days=1)
     url = add_query(ep, sid=sid, start=int(day_start.timestamp()), end=int(day_end.timestamp()))
-    label = "Zeitfenster"
-    dlabel = f"{WEEKDAYS[day_start.weekday()]} {day_start:%d.%m.}"
+    label = "Time window"
+    dlabel = f"{WEEKDAYS[day_start.weekday()]} {day_start:%Y-%m-%d}"
     doc = fetch_tva(ctx, sc, url, label, dlabel)
     days = sc.stats.setdefault("days", {})
     if doc is None:
@@ -271,11 +271,11 @@ def check_schedule_day(ctx, sc, ep, sid, day_start: datetime, offset: int) -> tu
             if s.get(a) is None:
                 sc.counters[("CG-SCHED-ATTR", a)] += 1
         if s.get("serviceIDRef") not in (None, sid):
-            sc.add("CG-SID", Severity.ERROR, f"{label}: Schedule@serviceIDRef passt nicht zur angefragten sid",
+            sc.add("CG-SID", Severity.ERROR, f"{label}: Schedule@serviceIDRef does not match the requested sid",
                    detail=f"{dlabel} · {s.get('serviceIDRef')} ≠ {sid}")
         events += events_of(s)
     for e in events:
-        _event_fields(sc, e, "Zeitfenster")
+        _event_fields(sc, e, "Time window")
     iv = sorted((max(e.start, day_start), min(e.end, day_end)) for e in events
                 if e.start and e.end and e.end > day_start and e.start < day_end)
     covered, gaps, overlaps, cursor = timedelta(), [], 0, day_start
@@ -291,59 +291,59 @@ def check_schedule_day(ctx, sc, ep, sid, day_start: datetime, offset: int) -> tu
         gaps.append((cursor, day_end))
     coverage = covered / (day_end - day_start)
     days[offset] = round(coverage, 3)
-    must = offset >= 0  # heute + 7 Tage „shall“, Vergangenheit „should“
+    must = offset >= 0  # today + 7 days "shall", past "should"
     if not events:
         sc.add("CG-DAY-EMPTY", Severity.ERROR if must else Severity.WARNING,
-               "Zeitfenster: keine Programmdaten für " + ("heute bzw. einen kommenden Tag" if must else "einen vergangenen Tag"),
-               ref="DTVP IT-6 (heute + 7 Tage „shall“, 7 Tage zurück „should“)", detail=f"{dlabel} · {url}")
+               "Time window: no programme data for " + ("today or an upcoming day" if must else "a past day"),
+               ref="DTVP IT-6 (today + 7 days 'shall', 7 days back 'should')", detail=f"{dlabel} · {url}")
     elif coverage < ctx.cfg.cg_min_coverage:
         g = ", ".join(f"{a.astimezone(day_start.tzinfo):%H:%M}–{b.astimezone(day_start.tzinfo):%H:%M}" for a, b in gaps[:4])
-        sc.add("CG-DAY-GAPS", Severity.WARNING, f"Zeitfenster: Tag nicht vollständig abgedeckt (< {ctx.cfg.cg_min_coverage:.0%})",
-               detail=f"{dlabel}: {coverage:.0%}, Lücken {g} · {url}")
+        sc.add("CG-DAY-GAPS", Severity.WARNING, f"Time window: day not fully covered (< {ctx.cfg.cg_min_coverage:.0%})",
+               detail=f"{dlabel}: {coverage:.0%}, gaps {g} · {url}")
     if overlaps:
-        sc.add("CG-DAY-OVERLAP", Severity.WARNING, "Zeitfenster: überlappende Events", detail=f"{dlabel}: {overlaps}× · {url}")
+        sc.add("CG-DAY-OVERLAP", Severity.WARNING, "Time window: overlapping events", detail=f"{dlabel}: {overlaps}× · {url}")
     images = []
     for e in events:
         pi = doc.programs.get(e.crid)
         if pi is not None:
-            images += check_program_info(sc, pi, "Zeitfenster")
+            images += check_program_info(sc, pi, "Time window")
         elif e.crid:
-            sc.counters[("CG-PI-INLINE", "Zeitfenster")] += 1
+            sc.counters[("CG-PI-INLINE", "Time window")] += 1
     return [e.crid for e in events if e.crid][:3], images
 
 
 def check_program_endpoint(ctx, sc, ep, crid) -> list:
     url = add_query(ep, pid=crid)
-    doc = fetch_tva(ctx, sc, url, "Programminfo")
+    doc = fetch_tva(ctx, sc, url, "Programme info")
     if doc is None:
-        sc.stats["program_info"] = "fehlerhaft"
+        sc.stats["program_info"] = "failed"
         return []
     pi = doc.programs.get(crid)
     if pi is None:
-        sc.add("CG-PROG-MISSING", Severity.ERROR, "Programminfo: angefragte programId fehlt in der Antwort",
+        sc.add("CG-PROG-MISSING", Severity.ERROR, "Programme info: requested programId missing from the response",
                detail=f"{crid} · {url}")
-        sc.stats["program_info"] = "ohne angefragtes Programm"
+        sc.stats["program_info"] = "requested programme missing"
         return []
     sc.stats["program_info"] = "ok"
-    return check_program_info(sc, pi, "Programminfo")
+    return check_program_info(sc, pi, "Programme info")
 
 
 # ------------------------------------------------------------------ aggregation
 COUNTER_TEXT = {
-    "CG-PI-BD": (Severity.ERROR, "ProgramInformation ohne BasicDescription", "DTVP IT-6 (Tab. 41)"),
-    "CG-PI-TITLE": (Severity.ERROR, "Programm ohne Title", "DTVP IT-6 (Tab. 42/43)"),
-    "CG-PI-SYN": (Severity.ERROR, "Programm ohne Synopsis", "DTVP IT-6 (Tab. 42/43)"),
-    "CG-PI-IMG": (Severity.ERROR, "Programm ohne Bild (RelatedMaterial)", "DTVP IT-6 (Tab. 42/43, Service Provider „M“)"),
-    "CG-PI-AGE": (Severity.ERROR, "Erstes ParentalGuidance ohne MinimumAge", "DTVP IT-6 (Tab. 61)"),
-    "CG-PI-CREDITS": (Severity.WARNING, "CreditsList mit mehr als 40 Einträgen", "DTVP IT-6 (Tab. 43)"),
-    "CG-PI-MISSING": (Severity.ERROR, "Event ohne zugehörige ProgramInformation", "A177 / DTVP IT-6"),
-    "CG-PI-INLINE": (Severity.INFO, "Event ohne ProgramInformation in derselben Antwort", "A177"),
-    "CG-EV-CRID": (Severity.ERROR, "ScheduleEvent ohne Program@crid", "DTVP IT-6 (Tab. 51)"),
-    "CG-EV-START": (Severity.ERROR, "ScheduleEvent ohne PublishedStartTime", "DTVP IT-6 (Tab. 51)"),
-    "CG-EV-DUR": (Severity.ERROR, "ScheduleEvent ohne PublishedDuration", "DTVP IT-6 (Tab. 51)"),
-    "CG-EV-INSTDESC": (Severity.ERROR, "ScheduleEvent ohne InstanceDescription", "DTVP IT-6 (Tab. 51, Service Provider „M“)"),
-    "CG-SCHED-ATTR": (Severity.ERROR, "Schedule ohne Pflichtattribut", "DTVP IT-6 (Tab. 50)"),
-    "CG-SLOW": (Severity.WARNING, "Langsame Antworten", "Leistung"),
+    "CG-PI-BD": (Severity.ERROR, "ProgramInformation without BasicDescription", "DTVP IT-6 (table 41)"),
+    "CG-PI-TITLE": (Severity.ERROR, "Programme without Title", "DTVP IT-6 (tables 42/43)"),
+    "CG-PI-SYN": (Severity.ERROR, "Programme without Synopsis", "DTVP IT-6 (tables 42/43)"),
+    "CG-PI-IMG": (Severity.ERROR, "Programme without image (RelatedMaterial)", "DTVP IT-6 (tables 42/43, service provider 'M')"),
+    "CG-PI-AGE": (Severity.ERROR, "First ParentalGuidance without MinimumAge", "DTVP IT-6 (table 61)"),
+    "CG-PI-CREDITS": (Severity.WARNING, "CreditsList with more than 40 entries", "DTVP IT-6 (table 43)"),
+    "CG-PI-MISSING": (Severity.ERROR, "Event without corresponding ProgramInformation", "A177 / DTVP IT-6"),
+    "CG-PI-INLINE": (Severity.INFO, "Event without ProgramInformation in the same response", "A177"),
+    "CG-EV-CRID": (Severity.ERROR, "ScheduleEvent without Program@crid", "DTVP IT-6 (table 51)"),
+    "CG-EV-START": (Severity.ERROR, "ScheduleEvent without PublishedStartTime", "DTVP IT-6 (table 51)"),
+    "CG-EV-DUR": (Severity.ERROR, "ScheduleEvent without PublishedDuration", "DTVP IT-6 (table 51)"),
+    "CG-EV-INSTDESC": (Severity.ERROR, "ScheduleEvent without InstanceDescription", "DTVP IT-6 (table 51, service provider 'M')"),
+    "CG-SCHED-ATTR": (Severity.ERROR, "Schedule without mandatory attribute", "DTVP IT-6 (table 50)"),
+    "CG-SLOW": (Severity.WARNING, "Slow responses", "Performance"),
 }
 
 
@@ -356,10 +356,10 @@ def flush_counters(sc: ServiceCG, cfg) -> None:
         if code == "CG-SCHED-ATTR":
             sc.add(code, sev, f"{msg} @{where}", ref, f"{n}×")
         elif code == "CG-SLOW":
-            sc.add(code, sev, f"{where}: {n} Antwort(en) langsamer als {cfg.cg_slow_seconds} s", ref)
+            sc.add(code, sev, f"{where}: {n} response(s) slower than {cfg.cg_slow_seconds} s", ref)
         else:
             base = sc.counters.get(("CG-EV-TOTAL" if code.startswith("CG-EV") else "CG-PI-TOTAL", where))
-            sc.add(code, sev, f"{where}: {msg}", ref, f"{n} von {base or '?'}")
+            sc.add(code, sev, f"{where}: {msg}", ref, f"{n} of {base or '?'}")
 
 
 # ------------------------------------------------------------------ module
@@ -368,20 +368,20 @@ def check_service(ctx: Context, svc: Service) -> ServiceCG:
     doc = ctx.doc
     cgs = doc.cg_source_for(svc)
     if cgs is None:
-        sc.add("CG-NOSOURCE", Severity.ERROR, "Keine Content-Guide-Quelle – kein EPG und kein Now/Next",
-               ref="DTVP IT-6 (ContentGuideSourceRef „M“)")
-        sc.stats["now_next"] = "keine Quelle"
+        sc.add("CG-NOSOURCE", Severity.ERROR, "No content guide source – no EPG and no now/next",
+               ref="DTVP IT-6 (ContentGuideSourceRef 'M')")
+        sc.stats["now_next"] = "no source"
         return sc
     sid = doc.cg_service_id(svc)
     sc.stats["sid"] = sid
     sched = doc.endpoint(cgs, "ScheduleInfoEndpoint")
     prog = doc.endpoint(cgs, "ProgramInfoEndpoint")
     if not sched:
-        sc.add("CG-NOEP", Severity.ERROR, "ContentGuideSource ohne ScheduleInfoEndpoint")
+        sc.add("CG-NOEP", Severity.ERROR, "ContentGuideSource without ScheduleInfoEndpoint")
         return sc
     for u in (sched, prog):
         if u and u.startswith("http://"):
-            sc.add("CG-HTTPS", Severity.WARNING, "Content-Guide-Endpoint ohne HTTPS", detail=u)
+            sc.add("CG-HTTPS", Severity.WARNING, "Content guide endpoint without HTTPS", detail=u)
     now = datetime.now(timezone.utc)
     crids, images = check_now_next(ctx, sc, sched, sid, now)
     tz = ZoneInfo(ctx.cfg.cg_timezone)
@@ -395,10 +395,10 @@ def check_service(ctx: Context, svc: Service) -> ServiceCG:
     if prog and crids:
         images += check_program_endpoint(ctx, sc, prog, crids[0])
     elif not prog:
-        sc.stats["program_info"] = "kein Endpoint"
-        sc.add("CG-NOPROG", Severity.INFO, "Kein ProgramInfoEndpoint (Detailansicht nur aus Schedule-Daten)",
-               ref="DTVP IT-6 („should“ für Receiver)")
-    # EPG-Bilder (Stichprobe)
+        sc.stats["program_info"] = "no endpoint"
+        sc.add("CG-NOPROG", Severity.INFO, "No ProgramInfoEndpoint (detail view only from schedule data)",
+               ref="DTVP IT-6 ('should' for receivers)")
+    # EPG images (sample)
     seen = set()
     sample = []
     for url, ct in images:
@@ -410,7 +410,7 @@ def check_service(ctx: Context, svc: Service) -> ServiceCG:
     for url, ct in sample:
         rep = check_image(ctx.client, url, kind="epg", declared_ct=ct, cfg=ctx.cfg)
         for i in rep.issues:
-            sc.add("CG-" + i.code, i.severity, "EPG-Bild: " + i.message, i.ref or REF,
+            sc.add("CG-" + i.code, i.severity, "EPG image: " + i.message, i.ref or REF,
                    (i.detail + " · " if i.detail else "") + url)
     flush_counters(sc, ctx.cfg)
     days = [v for v in sc.stats.get("days", {}).values() if v is not None]
@@ -427,7 +427,7 @@ def run(ctx: Context) -> ModuleResult:
     f = Findings("cg")
     with Timer() as t:
         if ctx.offline:
-            res.skipped = "Offline-Modus"
+            res.skipped = "Offline mode"
         else:
             svcs = [s for s in ctx.doc.services if "end-of-service-list" not in s.uid]
             if ctx.cfg.cg_max_services:
@@ -446,7 +446,7 @@ def run(ctx: Context) -> ModuleResult:
                 "now_next_ok": nn_ok,
                 "full_future_coverage": full,
                 "requests": sum(s.get("requests", 0) for s in per_service),
-                "window": f"-{ctx.cfg.cg_days_past} … +{ctx.cfg.cg_days_future} Tage ({ctx.cfg.cg_timezone})",
+                "window": f"-{ctx.cfg.cg_days_past} … +{ctx.cfg.cg_days_future} days ({ctx.cfg.cg_timezone})",
                 "per_service": per_service,
             }
     res.findings = f

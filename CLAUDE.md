@@ -1,134 +1,134 @@
 # CLAUDE.md
 
-Leitfaden für alle, die an diesem Projekt weiterarbeiten – Menschen wie KI-Assistenten
-(z. B. Claude Code). Für Installation und Bedienung siehe `README.md`.
+Guide for everyone continuing work on this project – humans and AI assistants
+(e.g. Claude Code) alike. For installation and usage see `README.md`.
 
-## Worum es geht
+## What it is about
 
-`dvbi-check` prüft DVB-I Service Lists auf Validität und Vollständigkeit für den deutschen
-Markt und erzeugt daraus einen Readiness-Report (HTML, JSON, CSV). Maßgeblich sind:
+`dvbi-check` checks DVB-I service lists for validity and completeness for the German market and
+produces a readiness report (HTML, JSON, CSV). The governing documents are:
 
-| Kürzel im Code | Dokument |
+| Abbreviation in code | Document |
 |---|---|
-| `A177` | DVB BlueBook A177r6 = ETSI TS 103 770 V1.2.1 (Namespace `urn:dvb:metadata:servicediscovery:2024`) |
-| `Book x.y` | DVB-I Book Germany, Ver. 1.0.1 (01.07.2026) |
-| `DTVP IT-n` | DTVP DVB-I Implementierungsprofil V1.0.1, Implementation Topic n |
-| `TS 102 809` | ETSI XML-AIT (Namespace `urn:dvb:mhp:2009`) |
+| `A177` | DVB BlueBook A177r6 = ETSI TS 103 770 V1.2.1 (namespace `urn:dvb:metadata:servicediscovery:2024`) |
+| `Book x.y` | DVB-I Book Germany, ver. 1.0.1 (2026-07-01) |
+| `DTVP IT-n` | DTVP DVB-I implementation profile V1.0.1, implementation topic n |
+| `TS 102 809` | ETSI XML AIT (namespace `urn:dvb:mhp:2009`) |
 | `TS 103 285` | DVB-DASH |
 
-Die Spezifikationen selbst liegen **nicht** im Repository (Urheberrecht). Wer Regeln ändert,
-braucht die Dokumente lokal.
+The specifications themselves are **not** part of the repository (copyright). Anyone changing
+rules needs the documents locally.
 
-## Befehle
+## Commands
 
 ```bash
 pip install -e ".[dev]"
-dvbi-check resources update                      # XSDs + Classification Schemes laden
-python -m unittest discover -s tests             # oder: python -m pytest
-dvbi-check run tests/fixtures/mini_sl.xml --offline   # schneller Rauchtest ohne Netz
+dvbi-check resources update                      # download XSDs + classification schemes
+python -m unittest discover -s tests             # or: python -m pytest
+dvbi-check run tests/fixtures/mini_sl.xml --offline   # quick smoke test without network
 ```
 
-Ohne Zugriff auf GitHub: `DVBI_CHECK_RESOURCES=/pfad/zu/dvb-i-tools` für Tests bzw.
-`--resources-dir` für die CLI (lokaler Klon von paulhiggs/dvb-i-tools).
+Without access to GitHub: `DVBI_CHECK_RESOURCES=/path/to/dvb-i-tools` for tests or
+`--resources-dir` for the CLI (local clone of paulhiggs/dvb-i-tools).
 
-## Architektur
+## Architecture
 
 ```
-cli.py            argparse; mappt CLI-Optionen auf Config
-runner.py         lädt Liste → ServiceListDoc → führt Module in checks.ORDER aus → RunResult
-config.py         Dataclass Config; Defaults < TOML (--config) < CLI
-loader.py         Datei oder URL (+ ?postcode=), HTTP-Metadaten
-httpclient.py     requests-Session pro Thread, Cache, Retries, Zeitmessung, add_query()
-sl.py             ServiceListDoc: revisionsunabhängiger Zugriff (Namespaces, Services,
-                  Regionen, LCN-Tabellen, CG-Quellen, Logos, Linked Apps, service_of())
-resources.py      gepinnte dvb-i-tools (PINNED_REF), Schema-Zuordnung je Namespace-Jahr
+cli.py            argparse; maps CLI options onto Config
+runner.py         loads list → ServiceListDoc → runs modules in checks.ORDER → RunResult
+config.py         dataclass Config; defaults < TOML (--config) < CLI
+loader.py         file or URL (+ ?postcode=), HTTP metadata
+httpclient.py     requests session per thread, cache, retries, timing, add_query()
+sl.py             ServiceListDoc: revision-independent access (namespaces, services,
+                  regions, LCN tables, CG sources, logos, linked apps, service_of())
+resources.py      pinned dvb-i-tools (PINNED_REF), schema mapping per namespace year
 model.py          Severity, Finding, Findings.add(), ModuleResult, MODULE_TITLES
 checks/
-  schema.py       XSD Standard + DE-Profilschema
-  a177.py         Semantik nach Standard
-  profile_de.py   Book + DTVP, inkl. LCN-Plan (Book 6.6) und Server-Tests (IT-5, IT-18)
-  contentguide.py TV-Anytime: now_next, Tagesfenster, Programminfo, EPG-Bilder
-  images.py       Logos: Breite, Größe, image_variant, ?w=
-  ait.py          XML-AITs der Linked Applications
-  mpd.py          DASH-MPDs, HLS-Erreichbarkeit
-report/           build_view() → Jinja2-Template report.html.j2; JSON; CSV (; + BOM)
+  schema.py       XSD standard + DE profile schema
+  a177.py         semantics according to the standard
+  profile_de.py   Book + DTVP, incl. LCN plan (Book 6.6) and server tests (IT-5, IT-18)
+  contentguide.py TV-Anytime: now_next, day windows, programme info, EPG images
+  images.py       logos: width, size, image_variant, ?w=
+  ait.py          XML AITs of linked applications
+  mpd.py          DASH MPDs, HLS reachability
+report/           build_view() → Jinja2 template report.html.j2; JSON; CSV (; + BOM)
 ```
 
-Jedes Modul exportiert `run(ctx: Context) -> ModuleResult`. Netzwerkmodule setzen bei
-`ctx.offline` `res.skipped` und tun sonst nichts.
+Each module exports `run(ctx: Context) -> ModuleResult`. Network modules set `res.skipped`
+when `ctx.offline` is true and do nothing else.
 
-## Konventionen
+## Conventions
 
-**Befunde.** Jeder Befund hat einen stabilen `code` mit Modulpräfix (`SC`, `CS/HD/RG/CG/SV/SI/LC`,
-`DE-…`, `CG-…`, `IMG-…`, `AIT-…`, `MPD-…`/`HLS-…`). Codes nicht umbenennen – Nutzer filtern
-und vergleichen Reports darüber. Neue Regel = neuer Code. Wo möglich `service=<UniqueIdentifier>`
-setzen, damit der Befund in der Service-Matrix erscheint; Kontext (Datum, URL, Tabelle)
-gehört in `detail`, **nicht** in `message`, sonst zerfällt die Gruppierung im Report.
+**Findings.** Every finding has a stable `code` with a module prefix (`SC`, `CS/HD/RG/CG/SV/SI/LC`,
+`DE-…`, `CG-…`, `IMG-…`, `AIT-…`, `MPD-…`/`HLS-…`). Do not rename codes – users filter and
+compare reports by them. New rule = new code. Set `service=<UniqueIdentifier>` wherever
+possible so the finding shows up in the service matrix; context (date, URL, table) belongs in
+`detail`, **not** in `message`, otherwise grouping in the report falls apart.
 
-**Schweregrade.**
-- `ERROR`: Verstoß gegen „shall“/„M“ oder technischer Defekt (nicht erreichbar, Schemafehler)
-- `WARNING`: Verstoß gegen „should“ oder Auffälligkeit mit wahrscheinlicher Receiver-Wirkung
-- `INFO`: Hinweis, oder Standardabweichung, die das DE-Profil ausdrücklich erlaubt
+**Severities.**
+- `ERROR`: violation of "shall"/"M" or technical defect (not reachable, schema error)
+- `WARNING`: violation of "should" or an anomaly likely to affect receivers
+- `INFO`: hint, or a deviation from the standard that the DE profile explicitly permits
 
-Im Profil `de` werden Standardregeln, die das DE-Profil lockert, herabgestuft (z. B. `SI05`,
-`SI06-DVBC/DVBT` nach DTVP IT-11/IT-12). Diese Logik bleibt in `a177.py` mit dem Flag `de`.
+With the `de` profile, standard rules that the DE profile relaxes are downgraded (e.g. `SI05`,
+`SI06-DVBC/DVBT` according to DTVP IT-11/IT-12). This logic stays in `a177.py` with the `de` flag.
 
-**Referenzen.** Das Feld `ref` nennt die Quelle. Klauselnummern nur angeben, wenn sie im
-Dokument nachgeprüft sind (oder vom DTVP-Profil bzw. dem Referenzvalidator zitiert werden).
-Im Zweifel allgemein bleiben (`"A177"`) statt eine Fundstelle zu erfinden.
+**References.** The `ref` field names the source. Only cite clause numbers that have been
+verified in the document (or are cited by the DTVP profile or the reference validator). When in
+doubt stay generic (`"A177"`) rather than inventing a clause.
 
-**Sprache.** Nutzertexte (Meldungen, Report, CLI, README) auf Deutsch; Bezeichner im Code
-englisch.
+**Language.** Everything is in English: user-facing texts (messages, report, CLI, README),
+comments and identifiers. Finding codes are language-neutral and must not change.
 
-**Kein Bezug auf reale Listen.** Repository, Tests und Beispiele enthalten keine echten
-Service-List-URLs, keine Daten realer Listen und keine Befunde realer Anbieter. Fixtures sind
-synthetisch (`example.org`, erfundene IDs).
+**No reference to real lists.** Repository, tests and examples contain no real service list
+URLs, no data from real lists and no findings about real providers. Fixtures are synthetic
+(`example.org`, invented IDs).
 
-**Sicherheit.** XML immer mit `no_network=True, resolve_entities=False` parsen
-(`sl.safe_parser()`). HTTP-Header nur ASCII (User-Agent wird in `cli.py` geprüft).
+**Security.** Always parse XML with `no_network=True, resolve_entities=False`
+(`sl.safe_parser()`). HTTP headers ASCII only (the User-Agent is checked in `cli.py`).
 
-## Ein neues Modul hinzufügen
+## Adding a new module
 
-1. `checks/<name>.py` mit `run(ctx)` anlegen; `Findings("<name>")` verwenden.
-2. In `checks/__init__.py` in `ORDER` und `_MODULES` eintragen, Titel in `model.MODULE_TITLES`.
-3. Spaltenkürzel im Template (`{"schema":"Schema", …}`) ergänzen; ggf. Statistik-Zeile auf
-   der Modulkarte und eine eigene Tabelle (Daten über `build_view()` bereitstellen).
-4. Optionen in `Config`, CLI und `dvbi-check.example.toml` ergänzen.
-5. Mock-Endpunkte in `tests/mockserver.py`, Fälle in `tests/fixtures/mini_sl.xml`,
-   Tests in `tests/test_checks.py` (positiver Fall ohne Fehler + gezielte Fehlerfälle).
-6. README-Tabelle der Module aktualisieren.
+1. Create `checks/<name>.py` with `run(ctx)`; use `Findings("<name>")`.
+2. Register it in `checks/__init__.py` in `ORDER` and `_MODULES`, title in `model.MODULE_TITLES`.
+3. Add the column abbreviation in the template (`{"schema":"Schema", …}`); if useful a statistics
+   line on the module card and a dedicated table (provide the data via `build_view()`).
+4. Add options to `Config`, the CLI and `dvbi-check.example.toml`.
+5. Mock endpoints in `tests/mockserver.py`, cases in `tests/fixtures/mini_sl.xml`,
+   tests in `tests/test_checks.py` (a positive case without errors + targeted error cases).
+6. Update the module table in the README.
 
 ## Tests
 
-`tests/mockserver.py` startet einen lokalen HTTP-Server (Port 0) für TV-Anytime-Antworten,
-Logos (mit Varianten), XML-AITs und MPDs. Die Fixture referenziert ihn über den Platzhalter
-`{BASE}`. Tests dürfen **keine** echten Netzwerkzugriffe auslösen. Die erzeugten TVA-Antworten
-sind schemakonform – ein `CG-XSD`-Befund im positiven Fall ist ein Fehler im Test oder im Code.
+`tests/mockserver.py` starts a local HTTP server (port 0) for TV-Anytime responses, logos
+(with variants), XML AITs and MPDs. The fixture references it via the placeholder `{BASE}`.
+Tests must **not** trigger real network access. The generated TVA responses are schema
+compliant – a `CG-XSD` finding in the positive case is a bug in the test or the code.
 
-Bewusst abgedeckte Fehlerfälle der Fixture: Regionalprogramm auf LCN 7 und zusätzlich im
-Block 41–49 (`DE-LCN-ARD7`), falsches Regionalprogramm auf LCN 7 (`DE-LCN-7MAP`),
-Service im Radio-Block ohne `linear-radio`, Pop-up ohne Out-of-Service-Banner, DVB-S ohne
-Tuning-Parameter, leerer Content Guide, Logo mit falscher Breite und ignorierten Varianten,
-fehlerhaftes AIT, statisches MPD mit zu geringer Qualität, nicht erreichbares MPD.
+Error cases deliberately covered by the fixture: regional programme on LCN 7 and again in
+block 41–49 (`DE-LCN-ARD7`), wrong regional programme on LCN 7 (`DE-LCN-7MAP`), service in the
+radio block without `linear-radio`, pop-up without out-of-service banner, DVB-S without tuning
+parameters, empty content guide, logo with wrong width and ignored variants, faulty AIT,
+static MPD with insufficient quality, unreachable MPD.
 
-## Bekannte Annahmen und offene Punkte
+## Known assumptions and open points
 
-- **image_variant**: Parametername `image_variant` (A177 5.2.8.2.1) ist konfigurierbar,
-  weil Bildserver abweichen können.
-- **Content-Guide-Abfragen** folgen dem DVB-I-Referenzvalidator
+- **image_variant**: the parameter name `image_variant` (A177 5.2.8.2.1) is configurable
+  because image servers may differ.
+- **Content guide requests** follow the DVB-I reference validator
   (`?sid=…&now_next=true`, `?sid=…&start=…&end=…`, `?pid=…`).
-- **LCN-Regeln aus Book 6.6** erkennen ARD/RTL/SAT.1 über reguläre Ausdrücke
-  (`pattern_ard`, `pattern_rtl`, `pattern_sat1`); die Referenztabelle ist die LCNTable mit
-  der obersten Region als TargetRegion.
-- **XML-AIT** wird strukturell geprüft; ein offizielles XSD ist optional (`--ait-xsd`).
-  Einstiegs-URLs der Apps per `http://` sind in der Praxis üblich und werden bewusst **nicht**
-  beanstandet (früherer Code `AIT-APP-HTTPS` entfällt). Geprüft wird nur ihre Erreichbarkeit.
-- **Nicht prüfbar**: Sortierung nach AGF/Genre/Alphabet, Pop-up-Kontingente,
-  Richtigkeit der Accessibility-Signalisierung, Segment-Abspielbarkeit, Funktion der Apps.
-- **Schema-Ressourcen** sind auf `resources.PINNED_REF` festgelegt. Beim Aktualisieren
-  Tests laufen lassen und die Änderung im Commit begründen.
+- **LCN rules from Book 6.6** recognise ARD/RTL/SAT.1 via regular expressions
+  (`pattern_ard`, `pattern_rtl`, `pattern_sat1`); the reference table is the LCNTable whose
+  TargetRegion is the top-level region.
+- **XML AIT** is checked structurally; an official XSD is optional (`--ait-xsd`).
+  Application entry URLs using `http://` are common practice and are deliberately **not**
+  flagged (the former code `AIT-APP-HTTPS` was removed). Only their reachability is checked.
+- **Not checkable**: ordering by AGF/genre/alphabet, pop-up quotas, correctness of
+  accessibility signalling, segment playability, functionality of apps.
+- **Schema resources** are pinned to `resources.PINNED_REF`. When updating, run the tests and
+  justify the change in the commit message.
 
 ## Commits
 
-Kleine, thematische Commits mit deutscher Beschreibung. Vor jedem Commit:
+Small, focused commits with English messages. Before every commit:
 `python -m unittest discover -s tests`.

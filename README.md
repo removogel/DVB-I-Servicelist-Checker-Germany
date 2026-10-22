@@ -1,132 +1,136 @@
 # dvbi-check
 
-Prüfwerkzeug für DVB-I Service Lists nach **DVB A177r6** (ETSI TS 103 770 V1.2.1), dem
-**DVB-I Book Germany 1.0.1** und dem **DTVP DVB-I Implementierungsprofil V1.0.1**.
-Es erzeugt eine Auswertung als HTML-Report, JSON und CSV.
+Validation tool for DVB-I service lists according to **DVB A177r6** (ETSI TS 103 770 V1.2.1),
+the **DVB-I Book Germany 1.0.1** and the **DTVP DVB-I implementation profile V1.0.1**.
+It produces a report as HTML, JSON and CSV.
 
-| Modul | Prüft |
+| Module | Checks |
 |---|---|
-| `schema` | XSD-Validierung gegen das A177-Standardschema und – für A177r6 – das deutsche Profilschema; Content-Type der Auslieferung |
-| `a177` | Semantik nach Standard: eindeutige IDs, tag:-URIs, Classification-Scheme-Werte, Regionen und PLZ-Überlappungen, LCN-Referenzen, Zustellparameter, Logos, Content-Guide-Verweise |
-| `profile` | Vollständigkeit nach Book und DTVP: „M“-Felder aus IT-6, Direct Tuning DVB-S (IT-13), Broadband-Instanz (Book 7.3), DRM über Linked App (Book 11.3), Content-Guide-Proxy (Book 12), LCN-Plan nach Book 6.6 (Blöcke, LCN 7/41–49, 50/51, Radio-Block, Endkanal 3999), Pop-up-Kanäle (Book 6.9), Regionstiefe (Book 10.2); bei URL-Quellen zusätzlich ungültige PLZ (IT-5) und Conditional GET (IT-18) |
-| `cg` | Content-Guide-Endpunkte (TV-Anytime): Now/Next, Zeitfenster für jeden Tag von −7 bis +7, Programminfo; TVA-XSD; Pflichtfelder nach DTVP IT-6 (Tab. 41–64); Tagesabdeckung, Lücken, Überlappungen; Stichprobe der EPG-Bilder |
-| `ait` | XML-AITs der Linked Applications: Erreichbarkeit, Content-Type `application/vnd.dvb.ait+xml`, Struktur nach ETSI TS 102 809 (Namespace, orgId/appId, Anwendungstyp `application/vnd.hbbtv.xhtml+xml`, controlCode, mhpVersion, HTTP-Transport, applicationLocation), AUTOSTART bei Linked Apps, Erreichbarkeit der Einstiegsseite; optional XSD-Validierung mit `--ait-xsd` |
-| `mpd` | DASH-Manifeste: Erreichbarkeit, Antwortzeit, Content-Type, MPD-Struktur, DVB-DASH-Profil (DTVP IT-3), `type="dynamic"` mit `availabilityStartTime` und UTCTiming, Codecs, DRM, Mindestqualität für TV nach Book 7.3 (960×540, > 2,5 Mbit/s); HLS-Playlists auf Erreichbarkeit |
-| `images` | Logo-Endpunkte: Erreichbarkeit, Content-Type, Standardbreite 320 px, Dateigröße, Pflichtvarianten `16x9_colour`, `16x9_colour_light`, `16x9_colour_dark`, Transparenz, Breitenparameter `?w=` |
+| `schema` | XSD validation against the A177 standard schema and – for A177r6 – the German profile schema; Content-Type of the delivery |
+| `a177` | Semantics according to the standard: unique IDs, tag: URIs, classification scheme values, regions and postcode overlaps, LCN references, delivery parameters, logos, content guide references |
+| `profile` | Completeness according to the Book and DTVP: "M" fields from IT-6, DVB-S direct tuning (IT-13), broadband instance (Book 7.3), DRM via linked application (Book 11.3), content guide proxy (Book 12), LCN plan according to Book 6.6 (blocks, LCN 7/41–49, 50/51, radio block, end channel 3999), pop-up channels (Book 6.9), region depth (Book 10.2); for URL sources also invalid postcode handling (IT-5) and conditional GET (IT-18) |
+| `cg` | Content guide endpoints (TV-Anytime): now/next, a time window for every day from −7 to +7, programme info; TVA XSD; mandatory fields according to DTVP IT-6 (tables 41–64); daily coverage, gaps, overlaps; sample of EPG images |
+| `ait` | XML AITs of linked applications: reachability, Content-Type `application/vnd.dvb.ait+xml`, structure according to ETSI TS 102 809 (namespace, orgId/appId, application type `application/vnd.hbbtv.xhtml+xml`, controlCode, mhpVersion, HTTP transport, applicationLocation), AUTOSTART for linked apps, reachability of the entry page; optional XSD validation with `--ait-xsd` |
+| `mpd` | DASH manifests: reachability, response time, Content-Type, MPD structure, DVB-DASH profile (DTVP IT-3), `type="dynamic"` with `availabilityStartTime` and UTCTiming, codecs, DRM, minimum quality for TV according to Book 7.3 (960×540, > 2.5 Mbit/s); HLS playlists for reachability |
+| `images` | Logo endpoints: reachability, Content-Type, default width 320 px, file size, mandatory variants `16x9_colour`, `16x9_colour_light`, `16x9_colour_dark`, transparency, width parameter `?w=` |
 
 ## Installation
 
-Voraussetzung: Python 3.11 oder neuer.
+Requirement: Python 3.11 or newer.
 
 ```bash
+git clone https://github.com/removogel/DVB-I-Servicelist-Checker-Germany.git
+cd DVB-I-Servicelist-Checker-Germany
 python -m venv .venv && source .venv/bin/activate
 pip install -e .
-dvbi-check resources update     # lädt XSD-Schemas und Classification Schemes (einmalig)
+dvbi-check resources update     # downloads XSD schemas and classification schemes (once)
 ```
 
-Die Schemas stammen aus [paulhiggs/dvb-i-tools](https://github.com/paulhiggs/dvb-i-tools)
-(BSD-2-Clause). Sie werden auf einen festen Commit gepinnt und unter `~/.cache/dvbi-check`
-abgelegt (änderbar über `DVBI_CHECK_HOME`). Ist GitHub nicht erreichbar, kann mit
-`--resources-dir` ein lokaler Klon angegeben werden.
+The schemas come from [paulhiggs/dvb-i-tools](https://github.com/paulhiggs/dvb-i-tools)
+(BSD-2-Clause). They are pinned to a fixed commit and stored in `~/.cache/dvbi-check`
+(configurable via `DVBI_CHECK_HOME`). If GitHub is not reachable, a local clone can be
+specified with `--resources-dir`.
 
-## Verwendung
+## Usage
 
 ```bash
-# Vollständige Prüfung einer Service List per URL
-# (ggf. freigeschalteten User-Agent angeben, Book 11.1)
-dvbi-check run https://<service-list-provider>/<pfad-zur-service-list> \
-    --user-agent "<freigeschalteter User-Agent>" --out reports/
+# Full check of a service list via URL
+# (specify a whitelisted User-Agent if required, Book 11.1)
+dvbi-check run https://<service-list-provider>/<path-to-service-list> \
+    --user-agent "<whitelisted User-Agent>" --out reports/
 
-# Schneller Lauf: nur 10 Services im Content Guide, 2 Tage zurück und voraus
+# Quick run: only 10 services in the content guide, 2 days back and ahead
 dvbi-check run <URL> --cg-max-services 10 --cg-days-past 2 --cg-days-future 2
 
-# Regionalisierte Liste
+# Regionalised list
 dvbi-check run <URL> --postcode 06217
 
-# Offline gegen eine Datei (Schema, A177, Profil)
-dvbi-check run v6.xml --offline
+# Offline against a file (schema, A177, profile)
+dvbi-check run servicelist.xml --offline
 
-# Nur bestimmte Module
+# Selected modules only
 dvbi-check run <URL> --modules cg,images
 dvbi-check run <URL> --modules ait,mpd
 
-# XML-AIT zusätzlich gegen das ETSI-Schema validieren
-dvbi-check run <URL> --modules ait --ait-xsd pfad/zu/mis_xmlait.xsd
+# Additionally validate XML AITs against the ETSI schema
+dvbi-check run <URL> --modules ait --ait-xsd path/to/mis_xmlait.xsd
 
-# Mit Konfigurationsdatei
+# With a configuration file
 cp dvbi-check.example.toml dvbi-check.toml
 dvbi-check run <URL> --config dvbi-check.toml
 ```
 
-Ausgabe in `--out` (Standard `dvbi-report/`):
+Output in `--out` (default `dvbi-report/`):
 
-- `dvbi-report-<Datum>.html` – eigenständiger Report: Kennzahlen, Modulstatus, Service-Matrix,
-  EPG-Abdeckung je Tag, Logo-Tabelle, filterbare Befunde mit Spezifikationsverweis
-- `.json` – vollständige Ergebnisse einschließlich Statistiken je Service
-- `.csv` – alle Befunde (Semikolon, UTF-8 mit BOM, öffnet direkt in Excel)
+- `dvbi-report-<date>.html` – self-contained report: key figures, module status, service
+  matrix, EPG coverage per day, tables for logos, AITs and manifests, filterable findings with
+  specification references
+- `.json` – complete results including statistics per service
+- `.csv` – all findings (semicolon-separated, UTF-8 with BOM, opens directly in Excel)
 
-Exit-Code: `1`, wenn Fehler gefunden wurden. Mit `--fail-on warning` gilt das auch für
-Warnungen, mit `--fail-on never` nie. So lässt sich das Werkzeug in CI-Pipelines einsetzen.
+Exit code: `1` if errors were found. With `--fail-on warning` this also applies to warnings,
+with `--fail-on never` never. This makes the tool usable in CI pipelines.
 
-## Bewertung
+## Severity
 
-- **Fehler**: Verstoß gegen „shall“/„M“ aus A177, Book oder DTVP, oder ein technischer Defekt
-  (Endpunkt nicht erreichbar, Schemafehler).
-- **Warnung**: Verstoß gegen „should“, oder eine Auffälligkeit mit wahrscheinlicher Auswirkung
-  beim Receiver.
-- **Hinweis**: Information oder Abweichung vom Standard, die das deutsche Profil ausdrücklich
-  zulässt (z. B. DVB-C-Triplets nur mit serviceId nach IT-12).
+- **Error**: violation of a "shall"/"M" requirement from A177, the Book or DTVP, or a technical
+  defect (endpoint not reachable, schema error).
+- **Warning**: violation of a "should", or an anomaly likely to affect receivers.
+- **Info**: information, or a deviation from the standard that the German profile explicitly
+  permits (e.g. DVB-C triplets with serviceId only, according to IT-12).
 
-Im Profil `de` gilt das deutsche Profilschema als maßgeblich. Abweichungen vom Standardschema
-werden dann als Warnung gemeldet, weil strikt validierende Clients die Liste ablehnen könnten.
+With the `de` profile the German profile schema is authoritative. Deviations from the standard
+schema are then reported as warnings, because strictly validating clients might reject the list.
 
-## Konventionen und Annahmen
+## Conventions and assumptions
 
-- Content-Guide-Abfragen wie im DVB-I-Referenzvalidator:
+- Content guide requests as in the DVB-I reference validator:
   `?sid=…&now_next=true`, `?sid=…&start=<epoch>&end=<epoch>`, `?pid=<crid>`.
-  `sid` ist `ContentGuideServiceRef`, ersatzweise `UniqueIdentifier`.
-- Tagesfenster werden in `cg_timezone` (Standard Europe/Berlin) gebildet. Vergangene Tage ohne
-  Daten sind eine Warnung („should“), heute und kommende Tage ein Fehler („shall“).
-- Logo-Varianten werden über `?image_variant=<wert>` abgefragt (A177 5.2.8.2.1). Ist der
-  Parametername bei eurem Bildserver anders, lässt er sich per `image_variant_param` anpassen.
-- Der LCN-Plan wird gegen die bundesweite Referenztabelle geprüft (TargetRegion = oberste
-  Region). Die Regel `DE-LCN-7MAP` erkennt Fälle, in denen LCN 7 nicht zu dem Hauptprogramm
-  passt, dessen Platz im Block 41–49 frei gelassen wurde.
-- Die Erkennung von ARD, RTL und SAT.1 für die Regeln aus Book 6.6 erfolgt über reguläre
-  Ausdrücke (`pattern_ard`, `pattern_rtl`, `pattern_sat1`), die sich konfigurieren lassen.
+  `sid` is `ContentGuideServiceRef`, otherwise `UniqueIdentifier`.
+- Day windows are formed in `cg_timezone` (default Europe/Berlin). Past days without data are a
+  warning ("should"), today and upcoming days an error ("shall").
+- Logo variants are requested via `?image_variant=<value>` (A177 5.2.8.2.1). If your image
+  server uses a different parameter name, it can be changed via `image_variant_param`.
+- The LCN plan is checked against the nationwide reference table (TargetRegion = top-level
+  region). Rule `DE-LCN-7MAP` detects cases where LCN 7 does not match the main programme whose
+  slot in block 41–49 was left empty.
+- ARD, RTL and SAT.1 are recognised for the Book 6.6 rules by configurable regular expressions
+  (`pattern_ard`, `pattern_rtl`, `pattern_sat1`).
+- HTTP entry URLs of HbbTV applications in XML AITs are common practice and are deliberately
+  not flagged.
 
-## Nicht automatisch prüfbar
+## Not checked automatically
 
-- Sortierung innerhalb der Blöcke nach AGF-Daten, Genre oder Alphabet (Book 6.6)
-- Pop-up-Kontingente je Anbieter (Book 6.9, benötigt AGF-Marktanteile)
-- Inhaltliche Richtigkeit der Accessibility-Signalisierung (Book 15, DTVP IT-16)
-- Abspielbarkeit von DASH-Streams (Segmente werden nicht geladen) und Funktion der HbbTV-Anwendungen
-- XML-AIT gegen das offizielle ETSI-Schema nur, wenn `mis_xmlait.xsd` über `--ait-xsd` angegeben wird
+- Ordering within blocks by AGF data, genre or alphabet (Book 6.6)
+- Pop-up quotas per provider (Book 6.9, requires AGF market shares)
+- Correctness of accessibility signalling (Book 15, DTVP IT-16)
+- Playability of DASH streams (segments are not fetched) and functionality of HbbTV applications
+- XML AITs against the official ETSI schema, unless `mis_xmlait.xsd` is provided via `--ait-xsd`
 
-## Entwicklung
+## Development
 
-Architektur, Konventionen (Befund-Codes, Schweregrade, Referenzen) und das Vorgehen für
-neue Module stehen in [`CLAUDE.md`](CLAUDE.md).
+Architecture, conventions (finding codes, severities, references) and the procedure for adding
+modules are described in [`CLAUDE.md`](CLAUDE.md).
 
 ```bash
 pip install -e ".[dev]"
-python -m pytest            # oder: python -m unittest discover -s tests
+python -m pytest            # or: python -m unittest discover -s tests
 ```
 
-Die Tests starten einen lokalen Mock-Server (`tests/mockserver.py`), der TV-Anytime-Antworten
-und Logos liefert. Die Fixture `tests/fixtures/mini_sl.xml` ist synthetisch und enthält gezielt
-Fehlerfälle (u. a. ein doppelt gelistetes Regionalprogramm auf LCN 7 und im Block 41–49 sowie
-ein falsch zugeordnetes Regionalprogramm auf LCN 7). Ohne
-Internetzugang lässt sich ein lokales Schema-Verzeichnis über `DVBI_CHECK_RESOURCES` angeben.
+The tests start a local mock server (`tests/mockserver.py`) that serves TV-Anytime responses,
+logos, XML AITs and MPDs. The fixture `tests/fixtures/mini_sl.xml` is synthetic and contains
+deliberate error cases (e.g. a regional programme listed on LCN 7 and again in block 41–49, and
+a wrongly assigned regional programme on LCN 7). Without internet access a local schema
+directory can be specified via `DVBI_CHECK_RESOURCES`.
 
 ```
 src/dvbi_check/
-  cli.py            Kommandozeile
-  runner.py         Ablaufsteuerung
-  config.py         Konfiguration (Defaults < TOML < CLI)
-  sl.py             Zugriff auf die Service List
-  httpclient.py     HTTP mit Cache, Retries, Zeitmessung
-  resources.py      XSD/Classification Schemes (gepinnt)
+  cli.py            command line
+  runner.py         orchestration
+  config.py         configuration (defaults < TOML < CLI)
+  sl.py             service list access
+  httpclient.py     HTTP with cache, retries, timing
+  resources.py      XSD / classification schemes (pinned)
   checks/           schema, a177, profile_de, contentguide, images, ait, mpd
   report/           HTML (Jinja2), JSON, CSV
 ```

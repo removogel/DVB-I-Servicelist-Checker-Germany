@@ -1,4 +1,4 @@
-"""Zugriff auf eine DVB-I Service List unabhängig von der Schema-Revision."""
+"""Access to a DVB-I service list independent of the schema revision."""
 from __future__ import annotations
 
 import re
@@ -54,7 +54,7 @@ class ServiceListDoc:
         self.tree = self.root.getroottree()
         q = etree.QName(self.root)
         if q.localname != "ServiceList" or not (q.namespace or "").startswith(SD_PREFIX):
-            raise ValueError(f"Kein DVB-I ServiceList-Dokument (Root: {self.root.tag})")
+            raise ValueError(f"Not a DVB-I ServiceList document (root: {self.root.tag})")
         self.ns = q.namespace
         self.ns_year = self.ns.rsplit(":", 1)[-1]
         self.tva_ns = self._find_ns(TVA_PREFIX) or "urn:tva:metadata:2024"
@@ -91,7 +91,7 @@ class ServiceListDoc:
             st = s.find("d:ServiceType", self.nsmap)
             out.append(Service(
                 uid=self.text(s, "d:UniqueIdentifier") or "",
-                name=self.text(s, "d:ServiceName") or "(ohne Name)",
+                name=self.text(s, "d:ServiceName") or "(no name)",
                 provider=self.text(s, "d:ProviderName") or "",
                 el=s,
                 service_type=st.get("href", "").rsplit(":", 1)[-1] if st is not None else None,
@@ -103,7 +103,7 @@ class ServiceListDoc:
         return {s.uid: s for s in self.services}
 
     def service_of(self, el) -> Service | None:
-        """Ermittelt den Service, zu dem ein beliebiges Element gehört."""
+        """Returns the service that an arbitrary element belongs to."""
         p = el
         while p is not None:
             if isinstance(p.tag, str) and local(p) == "Service" and p.getparent() is self.root:
@@ -144,7 +144,7 @@ class ServiceListDoc:
 
     def table_label(self, idx: int, t) -> str:
         regs = [x.text for x in t.findall("d:TargetRegion", self.nsmap)]
-        names = ", ".join(self.region_name(r) for r in regs) or "ohne TargetRegion"
+        names = ", ".join(self.region_name(r) for r in regs) or "no TargetRegion"
         return f"LCNTable #{idx} ({names})"
 
     # --------------------------------------------------- content guide sources
@@ -153,7 +153,7 @@ class ServiceListDoc:
         return {c.get("CGSID"): c for c in self.xr("d:ContentGuideSourceList/d:ContentGuideSource")}
 
     def cg_source_for(self, svc: Service):
-        """ContentGuideSource eines Service: inline > Referenz > Listen-Default (A177 5.5.x)."""
+        """ContentGuideSource of a service: inline > reference > list default (A177)."""
         inline = svc.el.find("d:ContentGuideSource", self.nsmap)
         if inline is not None:
             return inline

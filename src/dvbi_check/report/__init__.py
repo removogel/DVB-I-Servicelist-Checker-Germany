@@ -1,4 +1,4 @@
-"""Auswertung: HTML-Report, JSON und CSV."""
+"""Reporting: HTML report, JSON and CSV."""
 from __future__ import annotations
 
 import csv
@@ -29,9 +29,9 @@ def write_reports(rr: RunResult, out: Path, formats: list[str]) -> list[Path]:
         paths.append(p)
     if "csv" in formats:
         p = base.with_suffix(".csv")
-        with p.open("w", newline="", encoding="utf-8-sig") as fh:  # BOM für Excel
+        with p.open("w", newline="", encoding="utf-8-sig") as fh:  # BOM for Excel
             w = csv.writer(fh, delimiter=";")
-            w.writerow(["Modul", "Code", "Schwere", "Meldung", "Referenz", "Service-ID", "Betrifft", "Detail"])
+            w.writerow(["Module", "Code", "Severity", "Message", "Reference", "Service ID", "Subject", "Detail"])
             for fd in rr.findings:
                 w.writerow([MODULE_TITLES.get(fd.module, fd.module), fd.code, fd.severity.label, fd.message,
                             fd.ref, fd.service or "", fd.subject, fd.detail])
@@ -57,7 +57,7 @@ def to_json(rr: RunResult) -> dict:
 
 # --------------------------------------------------------------------------- view model
 def _lcn_index(rr: RunResult) -> dict[str, list[int]]:
-    """LCNs je Service aus der bundesweiten Referenztabelle (sonst alle Tabellen)."""
+    """LCNs per service from the nationwide reference table (otherwise all tables)."""
     doc = rr.doc
     from ..checks.profile_de import _reference_table  # noqa: PLC0415
     ref = _reference_table(doc)
@@ -66,7 +66,7 @@ def _lcn_index(rr: RunResult) -> dict[str, list[int]]:
     for t in tables:
         for l in t.findall("d:LCN", doc.nsmap):
             idx[l.get("serviceRef")].add(int(l.get("channelNumber")))
-    if ref is not None:  # Services, die nur regional vorkommen
+    if ref is not None:  # services that only appear regionally
         for t in doc.lcn_tables:
             for l in t.findall("d:LCN", doc.nsmap):
                 if l.get("serviceRef") not in idx:
@@ -147,7 +147,7 @@ def build_view(rr: RunResult) -> dict:
         "svc_total": svc_total, "svc_clean": svc_clean,
         "readiness": round(100 * svc_clean / svc_total) if svc_total else 0,
         "cg_rows": cg_rows, "cg_days": cg_days, "img_rows": img_rows, "ait_rows": ait_rows, "mpd_rows": mpd_rows, "cfg": rr.cfg,
-        "started": rr.started.astimezone(tz).strftime("%d.%m.%Y %H:%M"),
+        "started": rr.started.astimezone(tz).strftime("%Y-%m-%d %H:%M %Z"),
         "duration": round((rr.finished - rr.started).total_seconds(), 1) if rr.finished else None,
         "schema": rr.module("schema").stats if rr.module("schema") else {},
         "profile_stats": rr.module("profile").stats if rr.module("profile") else {},
@@ -157,5 +157,5 @@ def build_view(rr: RunResult) -> dict:
 def render_html(rr: RunResult) -> str:
     env = Environment(loader=PackageLoader("dvbi_check", "report/templates"),
                       autoescape=select_autoescape(["html", "j2"]), trim_blocks=True, lstrip_blocks=True)
-    env.filters["pct"] = lambda v: f"{v * 100:.0f} %" if isinstance(v, (int, float)) else "–"
+    env.filters["pct"] = lambda v: f"{v * 100:.0f}%" if isinstance(v, (int, float)) else "–"
     return env.get_template("report.html.j2").render(**build_view(rr))

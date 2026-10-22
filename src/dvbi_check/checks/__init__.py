@@ -1,4 +1,4 @@
-"""Prüfmodule. Jedes Modul exportiert run(ctx) -> ModuleResult."""
+"""Check modules. Each module exports run(ctx) -> ModuleResult."""
 from __future__ import annotations
 
 from dataclasses import dataclass

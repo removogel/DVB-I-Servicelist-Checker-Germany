@@ -1,3 +1,3 @@
-"""dvbi-check – Prüfwerkzeug für DVB-I Service Lists."""
+"""dvbi-check – validation tool for DVB-I service lists."""
 
 __version__ = "0.1.0"

@@ -1,4 +1,4 @@
-"""Gemeinsames Datenmodell für Befunde und Prüfergebnisse."""
+"""Shared data model for findings and check results."""
 from __future__ import annotations
 
 import time
@@ -14,7 +14,7 @@ class Severity(IntEnum):
 
     @property
     def label(self) -> str:
-        return {1: "Info", 2: "Warnung", 3: "Fehler"}[int(self)]
+        return {1: "Info", 2: "Warning", 3: "Error"}[int(self)]
 
 
 @dataclass
@@ -24,8 +24,8 @@ class Finding:
     severity: Severity
     message: str
     ref: str = ""
-    service: str | None = None   # UniqueIdentifier des betroffenen Service
-    subject: str = ""            # Kurzbezeichnung: Service-Name, URL, LCN-Tabelle …
+    service: str | None = None   # UniqueIdentifier of the affected service
+    subject: str = ""            # short label: service name, URL, LCN table …
     detail: str = ""
 
     def to_dict(self) -> dict[str, Any]:
@@ -42,7 +42,7 @@ class Finding:
 
 
 class Findings(list):
-    """Liste von Befunden eines Moduls mit bequemer add()-Methode."""
+    """List of a module's findings with a convenient add() method."""
 
     def __init__(self, module: str):
         super().__init__()
@@ -65,13 +65,13 @@ class Findings(list):
 
 
 MODULE_TITLES = {
-    "schema": "Schema-Validierung",
-    "a177": "Semantik nach A177r6",
-    "profile": "DVB-I Book Germany & DTVP-Profil",
+    "schema": "Schema validation",
+    "a177": "A177r6 semantics",
+    "profile": "DVB-I Book Germany & DTVP profile",
     "cg": "Content Guide & Now/Next (TV-Anytime)",
-    "images": "Logo- und Image-Endpunkte",
-    "ait": "XML-AITs (Linked Applications)",
-    "mpd": "Stream-Manifeste (DASH-MPD)",
+    "images": "Logo and image endpoints",
+    "ait": "XML AITs (linked applications)",
+    "mpd": "Stream manifests (DASH MPD)",
 }
 
 

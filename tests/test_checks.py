@@ -1,7 +1,7 @@
-"""Tests für dvbi-check (laufen mit `python -m unittest` oder pytest).
+"""Tests for dvbi-check (run with `python -m unittest` or pytest).
 
-Schema-Tests benötigen die dvb-i-tools-Ressourcen. Ohne Netz kann ein lokales
-Verzeichnis über DVBI_CHECK_RESOURCES angegeben werden.
+Schema tests require the dvb-i-tools resources. Without network access a local
+directory can be specified via DVBI_CHECK_RESOURCES.
 """
 from __future__ import annotations
 
@@ -60,7 +60,7 @@ class TestHelpers(unittest.TestCase):
 
 
 class TestFullRun(unittest.TestCase):
-    """Komplettlauf aller Module gegen einen lokalen Mock-Server."""
+    """Full run of all modules against a local mock server."""
 
     @classmethod
     def setUpClass(cls):
@@ -80,21 +80,21 @@ class TestFullRun(unittest.TestCase):
 
     def test_schema(self):
         if not self.has_schemas:
-            self.skipTest("Schemas nicht verfügbar")
+            self.skipTest("schemas not available")
         self.assertTrue(self.rr.module("schema").stats["valid_de_profile"])
 
     def test_profile_lcn_rules(self):
         c = codes(self.rr, "profile")
-        self.assertIn("DE-LCN-ARD7", c)         # Regionalprogramm auf LCN 7 und 44
-        self.assertIn("DE-LCN-7MAP", c)         # falsches Regionalprogramm auf LCN 7
-        self.assertIn("DE-LCN-RTYPE", c)        # Service im Radio-Block ohne linear-radio
+        self.assertIn("DE-LCN-ARD7", c)         # regional programme on LCN 7 and 44
+        self.assertIn("DE-LCN-7MAP", c)         # wrong regional programme on LCN 7
+        self.assertIn("DE-LCN-RTYPE", c)        # service in radio block without linear-radio
         self.assertIn("DE-POPUP-OOS", c)
         self.assertIn("DE-M-LCNRange", c)
-        self.assertNotIn("DE-LCN-END", c)       # 3999 korrekt belegt
+        self.assertNotIn("DE-LCN-END", c)       # 3999 correctly assigned
         sat = by_code(self.rr, "profile", "DE-SAT")
-        self.assertEqual([f.subject for f in sat], ["Zwei"])
+        self.assertEqual([f.subject for f in sat], ["Two"])
         dn = by_code(self.rr, "profile", "DE-M-DisplayName")
-        self.assertEqual([f.subject for f in dn], ["Zwei"])
+        self.assertEqual([f.subject for f in dn], ["Two"])
         m7 = by_code(self.rr, "profile", "DE-LCN-7MAP")[0]
         self.assertIn("ARD SR", m7.detail)
 
@@ -106,18 +106,18 @@ class TestFullRun(unittest.TestCase):
     def test_content_guide(self):
         cg = self.rr.module("cg")
         stats = {s["service"]: s for s in cg.stats["per_service"]}
-        eins = stats["tag:example.org,2026:eins"]
-        self.assertEqual(eins["now_next"], "ok")
-        self.assertEqual(eins["program_info"], "ok")
-        self.assertEqual(eins["avg_coverage"], 1.0)
-        self.assertFalse([f for f in cg.findings if f.service == eins["service"] and f.severity.name == "ERROR"],
-                         "vollständiger Service darf keine CG-Fehler haben")
-        self.assertNotIn("CG-XSD", codes(self.rr, "cg"), "Mock-Antworten müssen TVA-schemakonform sein")
-        zwei = [f.code for f in cg.findings if f.service == "tag:example.org,2026:zwei-leer"]
-        self.assertIn("CG-NN-EMPTY", zwei)
-        day = [f for f in cg.findings if f.code == "CG-DAY-EMPTY" and f.service == "tag:example.org,2026:zwei-leer"]
-        self.assertEqual({f.severity.name for f in day}, {"ERROR", "WARNING"})  # Zukunft Fehler, Vergangenheit Warnung
-        radio = [f.code for f in cg.findings if f.service == "tag:example.org,2026:radio-luecke"]
+        one = stats["tag:example.org,2026:one"]
+        self.assertEqual(one["now_next"], "ok")
+        self.assertEqual(one["program_info"], "ok")
+        self.assertEqual(one["avg_coverage"], 1.0)
+        self.assertFalse([f for f in cg.findings if f.service == one["service"] and f.severity.name == "ERROR"],
+                         "a complete service must not have CG errors")
+        self.assertNotIn("CG-XSD", codes(self.rr, "cg"), "mock responses must be TVA schema compliant")
+        two = [f.code for f in cg.findings if f.service == "tag:example.org,2026:two-empty"]
+        self.assertIn("CG-NN-EMPTY", two)
+        day = [f for f in cg.findings if f.code == "CG-DAY-EMPTY" and f.service == "tag:example.org,2026:two-empty"]
+        self.assertEqual({f.severity.name for f in day}, {"ERROR", "WARNING"})  # future = error, past = warning
+        radio = [f.code for f in cg.findings if f.service == "tag:example.org,2026:radio-gap"]
         self.assertIn("CG-PI-IMG", radio)
         self.assertIn("CG-EV-INSTDESC", radio)
         self.assertIn("CG-NOSOURCE", codes(self.rr, "cg"))
@@ -128,8 +128,8 @@ class TestFullRun(unittest.TestCase):
         ok = rows["ok.png"]
         self.assertEqual(ok["width"], 320)
         self.assertTrue(all(v.startswith("ok") for v in ok["variants"].values()), ok["variants"])
-        self.assertEqual(ok["width_param"], "unterstützt")
-        bad = [f.code for f in img.findings if f.subject == "Zwei"]
+        self.assertEqual(ok["width_param"], "supported")
+        bad = [f.code for f in img.findings if f.subject == "Two"]
         for c in ("IMG-WIDTH", "IMG-CT-MISMATCH", "IMG-VARIANT-SAME"):
             self.assertIn(c, bad)
 
@@ -137,19 +137,19 @@ class TestFullRun(unittest.TestCase):
         paths = write_reports(self.rr, self.tmp / "out", ["html", "json", "csv"])
         self.assertEqual(len(paths), 3)
         html = next(p for p in paths if p.suffix == ".html").read_text(encoding="utf-8")
-        self.assertIn("Testliste", html)
+        self.assertIn("Test list", html)
         self.assertIn("DE-LCN-7MAP", html)
 
 
 class TestAitMpd(TestFullRun):
-    """Nutzt denselben Komplettlauf; prüft die Module ait und mpd."""
+    """Uses the same full run; checks the ait and mpd modules."""
 
     def test_ait(self):
         ait = self.rr.module("ait")
         self.assertEqual(ait.stats["aits_checked"], 2)
-        ok = [f.code for f in ait.findings if f.subject == "Event-Kanal" and f.severity.name == "ERROR"]
-        self.assertEqual(ok, [], "gültiges AIT darf keine Fehler haben")
-        bad = {f.code for f in ait.findings if f.subject == "Ende der Liste"}
+        ok = [f.code for f in ait.findings if f.subject == "Event Channel" and f.severity.name == "ERROR"]
+        self.assertEqual(ok, [], "a valid AIT must not have errors")
+        bad = {f.code for f in ait.findings if f.subject == "End of List"}
         for c in ("AIT-CT", "AIT-ID", "AIT-TYPE", "AIT-TRANSPORT", "AIT-LOC", "AIT-AUTOSTART"):
             self.assertIn(c, bad)
         entry = ait.stats["aits"][0]["apps"] + ait.stats["aits"][1]["apps"]
@@ -158,11 +158,11 @@ class TestAitMpd(TestFullRun):
     def test_mpd(self):
         mpd = self.rr.module("mpd")
         by_svc = lambda name: {f.code for f in mpd.findings if f.subject == name}  # noqa: E731
-        self.assertFalse(by_svc("Eins") - {"MPD-HTTPS"}, "gültiges Live-MPD")
+        self.assertFalse(by_svc("One") - {"MPD-HTTPS"}, "valid live MPD")
         for c in ("MPD-PROFILE", "MPD-STATIC", "MPD-QUALITY", "MPD-BITRATE", "MPD-CT"):
             self.assertIn(c, by_svc("ARD Nord"))
         self.assertIn("MPD-HTTP", by_svc("ARD SWR"))
-        self.assertIn("MPD-NOVIDEO", by_svc("Radio Drei"))
+        self.assertIn("MPD-NOVIDEO", by_svc("Radio Three"))
         self.assertEqual(mpd.stats["mpds_checked"], 4)
 
 

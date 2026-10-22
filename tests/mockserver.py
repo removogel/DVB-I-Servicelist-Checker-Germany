@@ -1,4 +1,4 @@
-"""Lokaler Mock-Server für Content-Guide- und Image-Endpunkte (nur für Tests)."""
+"""Local mock server for content guide, image, AIT and MPD endpoints (tests only)."""
 from __future__ import annotations
 
 import io
@@ -41,8 +41,8 @@ def program_info(crid: str, base: str, member: str | None = None, with_image: bo
            f'<MediaLocator><MediaUri contentType="image/jpeg">{base}/epg/img.jpg</MediaUri></MediaLocator>'
            f'</RelatedMaterial>') if with_image else ""
     return (f'<ProgramInformation programId="{crid}"><BasicDescription>'
-            f'<Title type="main">Sendung {crid.rsplit("/", 1)[-1]}</Title>'
-            f'<Synopsis length="medium">Beschreibung der Sendung.</Synopsis>{img}'
+            f'<Title type="main">Programme {crid.rsplit("/", 1)[-1]}</Title>'
+            f'<Synopsis length="medium">Programme description.</Synopsis>{img}'
             f'</BasicDescription>{mem}</ProgramInformation>')
 
 
@@ -56,7 +56,7 @@ def event(crid: str, start: datetime, minutes: int, instance_desc: bool = True) 
 
 def tva(body: str) -> bytes:
     return (f'<?xml version="1.0" encoding="UTF-8"?><TVAMain xmlns="{TVA}" '
-            f'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xml:lang="de">'
+            f'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xml:lang="en">'
             f'<ProgramDescription>{body}</ProgramDescription></TVAMain>').encode()
 
 
@@ -65,7 +65,7 @@ AIT_OK = """<?xml version="1.0" encoding="UTF-8"?>
  <mhp:ApplicationDiscovery DomainName="example.org">
   <mhp:ApplicationList>
    <mhp:Application>
-    <mhp:appName Language="deu">Event-App</mhp:appName>
+    <mhp:appName Language="eng">Event app</mhp:appName>
     <mhp:applicationIdentifier><mhp:orgId>123</mhp:orgId><mhp:appId>1</mhp:appId></mhp:applicationIdentifier>
     <mhp:applicationDescriptor>
      <mhp:type><mhp:OtherApp>application/vnd.hbbtv.xhtml+xml</mhp:OtherApp></mhp:type>
@@ -102,7 +102,7 @@ def mpd(dynamic=True, dvb=True, width=1280, height=720, bw=5000000, video=True) 
            f'</AdaptationSet>') if video else ""
     return (f'<?xml version="1.0"?><MPD xmlns="urn:mpeg:dash:schema:mpd:2011" profiles="{prof}" {head} '
             f'minBufferTime="PT2S"><Period id="1" start="PT0S">{vid}'
-            f'<AdaptationSet contentType="audio" mimeType="audio/mp4" lang="de">'
+            f'<AdaptationSet contentType="audio" mimeType="audio/mp4" lang="en">'
             f'<Representation id="a1" codecs="mp4a.40.2" bandwidth="128000" audioSamplingRate="48000"/>'
             f'</AdaptationSet></Period>{utc}</MPD>').encode()
 
@@ -110,7 +110,7 @@ def mpd(dynamic=True, dvb=True, width=1280, height=720, bw=5000000, video=True) 
 class Handler(BaseHTTPRequestHandler):
     base = ""
 
-    def log_message(self, *a):  # still
+    def log_message(self, *a):  # quiet
         pass
 
     def send(self, data: bytes, ct: str, status: int = 200):
@@ -133,7 +133,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(png(320, 180, rgba=True, color=(250, 250, 250) if v.endswith("light") else (10, 10, 10)),
                                  "image/png")
             return self.send(png(320, 180), "image/png")
-        if p == "/logo/bad.png":   # falsche Breite, ignoriert Varianten
+        if p == "/logo/bad.png":   # wrong width, ignores variants
             return self.send(png(200, 200), "image/png")
         if p == "/ait/ok.aitx":
             return self.send(AIT_OK.format(base=self.base).encode(), "application/vnd.dvb.ait+xml")
@@ -153,14 +153,14 @@ class Handler(BaseHTTPRequestHandler):
             return self.schedule(q)
         if p == "/cg/program":
             pid = q.get("pid", "")
-            body = f'<ProgramInformationTable xml:lang="de">{program_info(pid, self.base)}</ProgramInformationTable>'
+            body = f'<ProgramInformationTable xml:lang="en">{program_info(pid, self.base)}</ProgramInformationTable>'
             return self.send(tva(body), "application/xml")
         self.send(b"not found", "text/plain", 404)
 
     def schedule(self, q):
         sid = q.get("sid", "")
         now = datetime.now(timezone.utc).replace(second=0, microsecond=0)
-        if sid.endswith("leer"):
+        if sid.endswith("empty"):
             body = f'<ProgramLocationTable><Schedule serviceIDRef="{sid}" start="{iso(now)}" end="{iso(now)}"/></ProgramLocationTable>'
             return self.send(tva(body), "application/xml")
         if q.get("now_next") == "true":
@@ -172,24 +172,24 @@ class Handler(BaseHTTPRequestHandler):
                 f'<GroupType xsi:type="ProgramGroupTypeType" value="otherCollection"/><BasicDescription/></GroupInformation>'
                 for g in (NOW, LATER))
             evs = event(crids[0], s_now, 30) + event(crids[1], s_now + timedelta(minutes=30), 30)
-            body = (f'<ProgramInformationTable xml:lang="de">{pis}</ProgramInformationTable>'
+            body = (f'<ProgramInformationTable xml:lang="en">{pis}</ProgramInformationTable>'
                     f'<GroupInformationTable>{groups}</GroupInformationTable>'
                     f'<ProgramLocationTable><Schedule serviceIDRef="{sid}" start="{iso(s_now)}" '
                     f'end="{iso(s_now + timedelta(hours=1))}">{evs}</Schedule></ProgramLocationTable>')
             return self.send(tva(body), "application/xml")
         start = datetime.fromtimestamp(int(q["start"]), timezone.utc)
         end = datetime.fromtimestamp(int(q["end"]), timezone.utc)
-        if sid.endswith("luecke") and start < now - timedelta(days=1):
+        if sid.endswith("gap") and start < now - timedelta(days=1):
             body = f'<ProgramLocationTable><Schedule serviceIDRef="{sid}" start="{iso(start)}" end="{iso(end)}"/></ProgramLocationTable>'
             return self.send(tva(body), "application/xml")
         pis, evs, t, i = [], [], start, 0
         while t < end:
             crid = f"crid://test.de/{int(t.timestamp())}"
-            pis.append(program_info(crid, self.base, with_image=not sid.endswith("luecke")))
-            evs.append(event(crid, t, 60, instance_desc=not sid.endswith("luecke")))
+            pis.append(program_info(crid, self.base, with_image=not sid.endswith("gap")))
+            evs.append(event(crid, t, 60, instance_desc=not sid.endswith("gap")))
             t += timedelta(hours=1)
             i += 1
-        body = (f'<ProgramInformationTable xml:lang="de">{"".join(pis)}</ProgramInformationTable>'
+        body = (f'<ProgramInformationTable xml:lang="en">{"".join(pis)}</ProgramInformationTable>'
                 f'<ProgramLocationTable><Schedule serviceIDRef="{sid}" start="{iso(start)}" end="{iso(end)}">'
                 f'{"".join(evs)}</Schedule></ProgramLocationTable>')
         return self.send(tva(body), "application/xml")

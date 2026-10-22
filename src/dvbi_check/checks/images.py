@@ -1,7 +1,7 @@
-"""Prüfung der Image-Endpunkte (Service-Logos, EPG-Bilder).
+"""Checks of the image endpoints (service logos, EPG images).
 
-Grundlage: DTVP IT-6 „Image Variants and Size“ und A177 5.2.8.2 (Query-Parameter
-für Breite und Bildvariante).
+Basis: DTVP IT-6 "Image Variants and Size" and A177 5.2.8.2 (query parameters
+for width and image variant).
 """
 from __future__ import annotations
 
@@ -67,54 +67,54 @@ def check_image(client: HttpClient, url: str, *, kind: str, declared_ct: str, cf
     exp_width = cfg.logo_width if is_logo else cfg.epg_image_width
     max_bytes = cfg.logo_max_bytes if is_logo else cfg.epg_image_max_bytes
     if url.startswith("http://"):
-        rep.add("IMG-HTTPS", Severity.WARNING, "Bild-URL ohne HTTPS")
+        rep.add("IMG-HTTPS", Severity.WARNING, "Image URL without HTTPS")
     r = client.get(url)
     rep.status, rep.elapsed, rep.bytes, rep.content_type = r.status, r.elapsed, len(r.content), r.content_type
     if not r.ok:
-        rep.add("IMG-HTTP", Severity.ERROR, "Bild nicht abrufbar", detail=r.describe())
+        rep.add("IMG-HTTP", Severity.ERROR, "Image not retrievable", detail=r.describe())
         return rep
     if not rep.content_type.startswith("image/"):
-        rep.add("IMG-CT", Severity.ERROR, "Antwort ist kein Bild (Content-Type)", detail=rep.content_type or "(leer)")
+        rep.add("IMG-CT", Severity.ERROR, "Response is not an image (Content-Type)", detail=rep.content_type or "(empty)")
     elif declared_ct and declared_ct.lower() != rep.content_type:
-        rep.add("IMG-CT-MISMATCH", Severity.WARNING, "Deklarierter contentType weicht vom ausgelieferten ab",
-                detail=f"deklariert {declared_ct}, geliefert {rep.content_type}")
+        rep.add("IMG-CT-MISMATCH", Severity.WARNING, "Declared contentType differs from the delivered one",
+                detail=f"declared {declared_ct}, delivered {rep.content_type}")
     if rep.content_type == "image/svg+xml":
-        rep.add("IMG-SVG", Severity.INFO, "SVG – Pixelbreite nicht messbar")
+        rep.add("IMG-SVG", Severity.INFO, "SVG – pixel width cannot be measured")
         default_bytes = r.content
     else:
         try:
             rep.width, rep.height, fmt, _ = _decode(r.content)
         except (UnidentifiedImageError, OSError, Image.DecompressionBombError) as e:
-            rep.add("IMG-DECODE", Severity.ERROR, "Bilddaten nicht dekodierbar", detail=str(e))
+            rep.add("IMG-DECODE", Severity.ERROR, "Image data cannot be decoded", detail=str(e))
             return rep
         if rep.width != exp_width:
             rep.add("IMG-WIDTH", Severity.ERROR,
-                    f"Standardbreite {rep.width} px statt {exp_width} px", ref=REF_SIZE + " „shall“",
+                    f"Default width {rep.width} px instead of {exp_width} px", ref=REF_SIZE + " 'shall'",
                     detail=f"{rep.width}×{rep.height}")
         if rep.height and abs(rep.width / rep.height - 16 / 9) > 0.05:
-            rep.add("IMG-RATIO", Severity.WARNING, "Standardvariante ist nicht 16:9",
+            rep.add("IMG-RATIO", Severity.WARNING, "Default variant is not 16:9",
                     ref=REF_VARIANT, detail=f"{rep.width}×{rep.height}")
         default_bytes = r.content
     if rep.bytes > max_bytes:
-        rep.add("IMG-SIZE", Severity.WARNING, f"Datei größer als {max_bytes // 1024} kB",
-                ref=REF_SIZE + " „should“", detail=f"{rep.bytes // 1024} kB")
+        rep.add("IMG-SIZE", Severity.WARNING, f"File larger than {max_bytes // 1024} kB",
+                ref=REF_SIZE + " 'should'", detail=f"{rep.bytes // 1024} kB")
 
     if not is_logo:
         return rep
 
-    # Breitenparameter (Server darf ihn ignorieren)
+    # width parameter (the server may ignore it)
     probe_w = max(exp_width // 2, 16)
     rw = client.get(add_query(url, **{cfg.image_width_param: probe_w}))
     if rw.ok and rep.content_type != "image/svg+xml":
         try:
             w, _, _, _ = _decode(rw.content)
-            rep.width_param = "unterstützt" if w == probe_w else f"ignoriert (liefert {w} px)"
+            rep.width_param = "supported" if w == probe_w else f"ignored (returns {w} px)"
         except Exception:  # noqa: BLE001
-            rep.width_param = "Antwort nicht dekodierbar"
+            rep.width_param = "response not decodable"
     else:
         rep.width_param = rw.describe()
 
-    # Bildvarianten
+    # image variants
     variants = list(cfg.logo_variants_mandatory)
     if cfg.check_optional_variants:
         variants += list(cfg.logo_variants_optional)
@@ -122,29 +122,29 @@ def check_image(client: HttpClient, url: str, *, kind: str, declared_ct: str, cf
         mandatory = v in cfg.logo_variants_mandatory
         rv = client.get(add_query(url, **{cfg.image_variant_param: v}))
         if not rv.ok or not rv.content_type.startswith("image/"):
-            rep.variants[v] = "fehlt"
+            rep.variants[v] = "missing"
             rep.add("IMG-VARIANT", Severity.ERROR if mandatory else Severity.INFO,
-                    f"Bildvariante {v} nicht abrufbar", ref=REF_VARIANT + (" (Pflicht)" if mandatory else ""),
+                    f"Image variant {v} not retrievable", ref=REF_VARIANT + (" (mandatory)" if mandatory else ""),
                     detail=rv.describe() + (f", Content-Type {rv.content_type}" if rv.ok else ""))
             continue
         if v.endswith(("_light", "_dark", "_white")) and rv.content == default_bytes:
-            rep.variants[v] = "identisch mit Standard"
+            rep.variants[v] = "same as default"
             rep.add("IMG-VARIANT-SAME", Severity.WARNING if mandatory else Severity.INFO,
-                    f"Variante {v} ist byte-identisch mit der Standardvariante – Parameter wird vermutlich ignoriert",
+                    f"Variant {v} is byte-identical to the default variant – parameter is probably ignored",
                     ref=REF_VARIANT)
             continue
         if rv.content_type != "image/svg+xml":
             try:
                 w, h, _, alpha = _decode(rv.content)
             except Exception as e:  # noqa: BLE001
-                rep.variants[v] = "nicht dekodierbar"
+                rep.variants[v] = "not decodable"
                 rep.add("IMG-VARIANT", Severity.ERROR if mandatory else Severity.INFO,
-                        f"Variante {v} nicht dekodierbar", ref=REF_VARIANT, detail=str(e))
+                        f"Variant {v} cannot be decoded", ref=REF_VARIANT, detail=str(e))
                 continue
             if "_on_transparent" in v or v.endswith(("_light", "_dark", "_white")):
                 if not alpha:
                     rep.add("IMG-VARIANT-ALPHA", Severity.WARNING,
-                            f"Variante {v} ohne Transparenz („… on transparent“)", ref=REF_VARIANT)
+                            f"Variant {v} without transparency ('… on transparent')", ref=REF_VARIANT)
             rep.variants[v] = f"ok ({w}×{h})"
         else:
             rep.variants[v] = "ok (SVG)"
@@ -156,7 +156,7 @@ def run(ctx: Context) -> ModuleResult:
     f = Findings("images")
     with Timer() as t:
         if ctx.offline:
-            res.skipped = "Offline-Modus"
+            res.skipped = "Offline mode"
         else:
             doc = ctx.doc
             users: dict[tuple[str, str], list] = defaultdict(list)
@@ -166,7 +166,7 @@ def run(ctx: Context) -> ModuleResult:
             for rm in doc.xr("d:RelatedMaterial"):
                 for mu in rm.iterfind(".//t:MediaUri", doc.nsmap):
                     if mu.text:
-                        users[(mu.text.strip(), mu.get("contentType", ""))]  # Listenlogo
+                        users[(mu.text.strip(), mu.get("contentType", ""))]  # service list logo
             with ThreadPoolExecutor(max_workers=ctx.cfg.workers) as ex:
                 futures = {key: ex.submit(check_image, ctx.client, key[0], kind="logo",
                                           declared_ct=key[1], cfg=ctx.cfg) for key in users}
@@ -178,7 +178,7 @@ def run(ctx: Context) -> ModuleResult:
                 for i in rep.issues:
                     for s in svcs:
                         f.add(i.code, i.severity, i.message, ref=i.ref,
-                              service=s.uid if s else None, subject=s.name if s else "Listenlogo",
+                              service=s.uid if s else None, subject=s.name if s else "Service list logo",
                               detail=(i.detail + " · " if i.detail else "") + rep.url)
             ok = [r for r in reports if r.status and 200 <= r.status < 300]
             res.stats = {

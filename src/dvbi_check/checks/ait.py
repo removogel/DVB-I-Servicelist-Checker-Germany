@@ -1,12 +1,12 @@
-"""Prüfung der XML-AITs der Linked Applications (HbbTV).
+"""Checks of the XML AITs of linked applications (HbbTV).
 
-Grundlagen: ETSI TS 102 809 (XML-AIT, Namespace urn:dvb:mhp:2009),
-ETSI TS 102 796 / HbbTV 2.0.4 (Anwendungstyp application/vnd.hbbtv.xhtml+xml),
-A177r6 Linked Applications (LinkedApplicationCS:2019) und DTVP IT-3/IT-6.
+Basis: ETSI TS 102 809 (XML AIT, namespace urn:dvb:mhp:2009),
+ETSI TS 102 796 / HbbTV 2.0.4 (application type application/vnd.hbbtv.xhtml+xml),
+A177r6 linked applications (LinkedApplicationCS:2019) and DTVP IT-3/IT-6.
 
-Ohne offizielles XSD werden Struktur und Pflichtangaben direkt geprüft. Ist
-`ait_xsd` konfiguriert (z. B. mis_xmlait.xsd aus TS 102 809), wird zusätzlich
-gegen das Schema validiert.
+Without an official XSD, structure and mandatory fields are checked directly. If
+`ait_xsd` is configured (e.g. mis_xmlait.xsd from TS 102 809), the AIT is also
+validated against the schema.
 """
 from __future__ import annotations
 
@@ -27,10 +27,10 @@ MHP_NS = "urn:dvb:mhp:2009"
 AIT_CT = "application/vnd.dvb.ait+xml"
 HBBTV_APP = "application/vnd.hbbtv.xhtml+xml"
 CONTROL_CODES = {"AUTOSTART", "PRESENT", "DESTROY", "KILL", "PREFETCH", "REMOTE", "DISABLED", "PLAYBACK_AUTOSTART"}
-REF_AIT = "ETSI TS 102 809 (XML-AIT)"
+REF_AIT = "ETSI TS 102 809 (XML AIT)"
 REF_HBB = "HbbTV / ETSI TS 102 796"
-APP_KINDS = {"1.1": "Linked App 1.1 (parallel)", "1.2": "Linked App 1.2 (Medienwiedergabe)",
-             "1.3": "Linked App 1.3", "2": "Out-of-Service-App", "3": "Provider-App"}
+APP_KINDS = {"1.1": "Linked App 1.1 (parallel)", "1.2": "Linked App 1.2 (media playback)",
+             "1.3": "Linked App 1.3", "2": "Out-of-service app", "3": "Provider app"}
 
 
 @dataclass
@@ -74,27 +74,27 @@ def check_ait(ctx: Context, url: str, declared_ct: str, kinds: set) -> AitReport
     rep = AitReport(url, declared_ct, set(kinds))
     cfg = ctx.cfg
     if url.startswith("http://"):
-        rep.add("AIT-HTTPS", Severity.WARNING, "AIT-URL ohne HTTPS")
+        rep.add("AIT-HTTPS", Severity.WARNING, "AIT URL without HTTPS")
     if declared_ct and declared_ct != AIT_CT:
-        rep.add("AIT-DECL-CT", Severity.WARNING, f"In der Service List deklarierter contentType ist nicht {AIT_CT}",
+        rep.add("AIT-DECL-CT", Severity.WARNING, f"contentType declared in the service list is not {AIT_CT}",
                 ref="A177 (Linked Application) / " + REF_HBB, detail=declared_ct)
     r = ctx.client.get(url)
     rep.status, rep.elapsed, rep.content_type = r.status, r.elapsed, r.content_type
     if not r.ok:
-        rep.add("AIT-HTTP", Severity.ERROR, "AIT nicht abrufbar", detail=r.describe())
+        rep.add("AIT-HTTP", Severity.ERROR, "AIT not retrievable", detail=r.describe())
         return rep
     if rep.content_type != AIT_CT:
         sev = Severity.WARNING if "xml" in rep.content_type else Severity.ERROR
-        rep.add("AIT-CT", sev, f"Server liefert Content-Type „{rep.content_type or '(leer)'}“ statt {AIT_CT}",
+        rep.add("AIT-CT", sev, f"Server returns Content-Type '{rep.content_type or '(empty)'}' instead of {AIT_CT}",
                 ref=REF_HBB)
     try:
         root = etree.fromstring(r.content, etree.XMLParser(no_network=True, resolve_entities=False))
     except etree.XMLSyntaxError as e:
-        rep.add("AIT-XML", Severity.ERROR, "AIT ist kein wohlgeformtes XML", detail=str(e))
+        rep.add("AIT-XML", Severity.ERROR, "AIT is not well-formed XML", detail=str(e))
         return rep
     q = etree.QName(root)
     if q.localname != "ServiceDiscovery" or q.namespace != MHP_NS:
-        rep.add("AIT-ROOT", Severity.ERROR, f"Root-Element ist nicht ServiceDiscovery im Namespace {MHP_NS}",
+        rep.add("AIT-ROOT", Severity.ERROR, f"Root element is not ServiceDiscovery in namespace {MHP_NS}",
                 ref=REF_AIT, detail=root.tag)
         return rep
     if cfg.ait_xsd:
@@ -102,54 +102,54 @@ def check_ait(ctx: Context, url: str, declared_ct: str, kinds: set) -> AitReport
             schema = load_schema(str(cfg.ait_xsd))
             if not schema.validate(root.getroottree()):
                 for e in list(schema.error_log)[:5]:
-                    rep.add("AIT-XSD", Severity.ERROR, "Schemafehler im XML-AIT", ref=REF_AIT,
+                    rep.add("AIT-XSD", Severity.ERROR, "Schema error in XML AIT", ref=REF_AIT,
                             detail=re.sub(r"\{[^}]*\}", "", e.message))
         except Exception as e:  # noqa: BLE001
-            rep.add("AIT-XSD", Severity.INFO, "AIT-Schema nicht ladbar", detail=str(e))
+            rep.add("AIT-XSD", Severity.INFO, "AIT schema could not be loaded", detail=str(e))
 
     apps = root.findall(f"{{{MHP_NS}}}ApplicationDiscovery/{{{MHP_NS}}}ApplicationList/{{{MHP_NS}}}Application")
     ad = _k(root, "ApplicationDiscovery")
     if ad is not None and not ad.get("DomainName"):
-        rep.add("AIT-DOMAIN", Severity.WARNING, "ApplicationDiscovery ohne @DomainName", ref=REF_AIT)
+        rep.add("AIT-DOMAIN", Severity.WARNING, "ApplicationDiscovery without @DomainName", ref=REF_AIT)
     if not apps:
-        rep.add("AIT-NOAPP", Severity.ERROR, "AIT enthält keine Application", ref=REF_AIT)
+        rep.add("AIT-NOAPP", Severity.ERROR, "AIT contains no Application", ref=REF_AIT)
         return rep
     autostart = 0
     for i, app in enumerate(apps, 1):
         info = {"name": _t(app, "appName")}
-        tag = f"Application {i}" + (f" „{info['name']}“" if info["name"] else "")
+        tag = f"Application {i}" + (f" '{info['name']}'" if info["name"] else "")
         aid = _k(app, "applicationIdentifier")
         org, appid = _t(aid, "orgId"), _t(aid, "appId")
         info["orgId"], info["appId"] = org, appid
         if not (org and org.isdigit() and appid and appid.isdigit()):
-            rep.add("AIT-ID", Severity.ERROR, "applicationIdentifier ohne gültige orgId/appId", ref=REF_AIT,
+            rep.add("AIT-ID", Severity.ERROR, "applicationIdentifier without valid orgId/appId", ref=REF_AIT,
                     detail=f"{tag}: orgId={org}, appId={appid}")
         desc = _k(app, "applicationDescriptor")
         if desc is None:
-            rep.add("AIT-DESC", Severity.ERROR, "applicationDescriptor fehlt", ref=REF_AIT, detail=tag)
+            rep.add("AIT-DESC", Severity.ERROR, "applicationDescriptor missing", ref=REF_AIT, detail=tag)
             continue
         app_type = _t(_k(desc, "type"), "OtherApp")
         info["type"] = app_type
         if app_type != HBBTV_APP:
-            rep.add("AIT-TYPE", Severity.ERROR, f"Anwendungstyp ist nicht {HBBTV_APP}", ref="DTVP IT-3 / " + REF_HBB,
+            rep.add("AIT-TYPE", Severity.ERROR, f"Application type is not {HBBTV_APP}", ref="DTVP IT-3 / " + REF_HBB,
                     detail=f"{tag}: {app_type}")
         cc = _t(desc, "controlCode")
         info["controlCode"] = cc
         if cc not in CONTROL_CODES:
-            rep.add("AIT-CC", Severity.ERROR, "controlCode fehlt oder ist ungültig", ref=REF_AIT, detail=f"{tag}: {cc}")
+            rep.add("AIT-CC", Severity.ERROR, "controlCode missing or invalid", ref=REF_AIT, detail=f"{tag}: {cc}")
         if cc == "AUTOSTART":
             autostart += 1
         for el in ("visibility", "priority", "version"):
             if _t(desc, el) is None:
-                rep.add("AIT-DESC-FIELD", Severity.WARNING, f"applicationDescriptor ohne {el}", ref=REF_AIT, detail=tag)
+                rep.add("AIT-DESC-FIELD", Severity.WARNING, f"applicationDescriptor without {el}", ref=REF_AIT, detail=tag)
         mv = _k(desc, "mhpVersion")
         if mv is None:
-            rep.add("AIT-MHPVER", Severity.WARNING, "applicationDescriptor ohne mhpVersion (HbbTV-Profil/Version)",
+            rep.add("AIT-MHPVER", Severity.WARNING, "applicationDescriptor without mhpVersion (HbbTV profile/version)",
                     ref=REF_HBB, detail=tag)
         else:
             info["version"] = ".".join(x for x in (_t(mv, "versionMajor"), _t(mv, "versionMinor"),
                                                    _t(mv, "versionMicro")) if x)
-        # Transport und Einstiegspunkt
+        # transport and entry point
         transports = _ks(app, "applicationTransport")
         base = None
         for t in transports:
@@ -158,36 +158,36 @@ def check_ait(ctx: Context, url: str, declared_ct: str, kinds: set) -> AitReport
                 base = _t(t, "URLBase")
         loc = _t(app, "applicationLocation")
         if base is None:
-            rep.add("AIT-TRANSPORT", Severity.ERROR, "Kein HTTPTransportType mit URLBase", ref=REF_AIT, detail=tag)
+            rep.add("AIT-TRANSPORT", Severity.ERROR, "No HTTPTransportType with URLBase", ref=REF_AIT, detail=tag)
         if loc is None:
-            rep.add("AIT-LOC", Severity.ERROR, "applicationLocation fehlt", ref=REF_AIT, detail=tag)
+            rep.add("AIT-LOC", Severity.ERROR, "applicationLocation missing", ref=REF_AIT, detail=tag)
         if base:
             entry = urljoin(base if base.endswith("/") else base + "/", loc or "")
             info["entry"] = entry
-            # HTTP-Einstiegs-URLs sind bei HbbTV-Apps üblich und werden bewusst nicht beanstandet.
+            # HTTP entry URLs are common for HbbTV apps and are deliberately not flagged.
             if cfg.ait_check_app_url and not ctx.offline:
                 ra = ctx.client.get(entry)
                 info["entry_status"] = ra.status
                 if not ra.ok:
-                    rep.add("AIT-APP-HTTP", Severity.ERROR, "Einstiegs-URL der Anwendung nicht abrufbar",
+                    rep.add("AIT-APP-HTTP", Severity.ERROR, "Application entry URL not retrievable",
                             detail=f"{tag}: {ra.describe()} · {entry}")
                 elif not any(x in ra.content_type for x in ("html", "xhtml")):
-                    rep.add("AIT-APP-CT", Severity.WARNING, "Einstiegsseite liefert keinen HTML/XHTML-Content-Type",
+                    rep.add("AIT-APP-CT", Severity.WARNING, "Entry page does not return an HTML/XHTML Content-Type",
                             ref=REF_HBB, detail=f"{tag}: {ra.content_type} · {entry}")
         rep.apps.append(info)
     if "1.2" in rep.kinds or "1.1" in rep.kinds:
         if autostart == 0:
             rep.add("AIT-AUTOSTART", Severity.WARNING,
-                    "Keine Application mit controlCode AUTOSTART – Linked App startet beim Umschalten nicht automatisch",
+                    "No Application with controlCode AUTOSTART – linked application does not start automatically on channel change",
                     ref="A177 (Linked Application) / " + REF_HBB)
         elif autostart > 1:
-            rep.add("AIT-AUTOSTART", Severity.WARNING, f"{autostart} Applications mit AUTOSTART (mehrdeutig)",
+            rep.add("AIT-AUTOSTART", Severity.WARNING, f"{autostart} Applications with AUTOSTART (ambiguous)",
                     ref=REF_HBB)
     return rep
 
 
 def collect(ctx: Context) -> dict[tuple[str, str], dict]:
-    """AIT-URLs aus allen RelatedMaterial mit LinkedApplicationCS – mit Services und App-Typen."""
+    """AIT URLs from all RelatedMaterial with LinkedApplicationCS – with services and app types."""
     doc = ctx.doc
     out: dict[tuple[str, str], dict] = defaultdict(lambda: {"services": [], "kinds": set()})
     for s in doc.services:
@@ -213,7 +213,7 @@ def run(ctx: Context) -> ModuleResult:
     f = Findings("ait")
     with Timer() as t:
         if ctx.offline:
-            res.skipped = "Offline-Modus"
+            res.skipped = "Offline mode"
         else:
             targets = collect(ctx)
             ait_targets = {k: v for k, v in targets.items() if k[1] in ("", AIT_CT, "application/xml")
@@ -229,16 +229,16 @@ def run(ctx: Context) -> ModuleResult:
                     for s in targets[k]["services"]:
                         f.add(code, sev, msg, ref=ref, service=s.uid, subject=s.name,
                               detail=(detail + " · " if detail else "") + rep.url)
-            # Linked Apps ohne XML-AIT (z. B. direkt verlinktes HTML): nur Erreichbarkeit
+            # linked apps without XML AIT (e.g. directly linked HTML): reachability only
             for (url, ct), v in other.items():
                 r = ctx.client.get(url)
                 for s in v["services"]:
-                    f.info("AIT-NOTAIT", f"Linked Application ohne XML-AIT (contentType {ct or 'leer'})",
+                    f.info("AIT-NOTAIT", f"Linked application without XML AIT (contentType {ct or 'empty'})",
                            ref="A177 (Linked Application)", service=s.uid, subject=s.name, detail=url)
                     if not r.ok:
-                        f.error("AIT-HTTP", "Linked Application nicht abrufbar", service=s.uid, subject=s.name,
+                        f.error("AIT-HTTP", "Linked application not retrievable", service=s.uid, subject=s.name,
                                 detail=f"{r.describe()} · {url}")
-            # Services mit Linked App 1.2 als einziger Wiedergabe: AIT-Fehler sind dort kritisch
+            # for services whose only playback is a linked app 1.2, AIT errors are critical
             ok = [r for r in reports if r.status and 200 <= r.status < 300]
             res.stats = {
                 "aits_checked": len(reports),

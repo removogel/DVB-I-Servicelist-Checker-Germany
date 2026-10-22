@@ -1,8 +1,8 @@
-"""Beschaffung der XSD-Schemas und Classification Schemes.
+"""Provisioning of XSD schemas and classification schemes.
 
-Quelle sind die BSD-lizenzierten dvb-i-tools von Paul Higgs
-(https://github.com/paulhiggs/dvb-i-tools), festgenagelt auf einen Commit,
-damit Prüfergebnisse reproduzierbar bleiben.
+Source is the BSD-licensed dvb-i-tools by Paul Higgs
+(https://github.com/paulhiggs/dvb-i-tools), pinned to a commit so that
+check results stay reproducible.
 """
 from __future__ import annotations
 
@@ -19,9 +19,9 @@ import requests
 from lxml import etree
 
 REPO = "paulhiggs/dvb-i-tools"
-PINNED_REF = "08b16ccd8d364e298c73c94964b17243e9d6fc91"  # Stand 18.10.2026, A177r6–r8
+PINNED_REF = "08b16ccd8d364e298c73c94964b17243e9d6fc91"  # as of 2026-10-18, A177r6–r8
 
-# Service-List-Namespace-Jahr -> (Standard-XSD, DE-Profil-XSD oder None)
+# service list namespace year -> (standard XSD, DE profile XSD or None)
 SL_SCHEMAS = {
     "2019": ("dvbi_v1.0.xsd", None),
     "2020": ("dvbi_v2.0.xsd", None),
@@ -80,19 +80,19 @@ def locate(resources_dir: str | Path | None = None, ref: str = PINNED_REF,
     if resources_dir:
         root = Path(resources_dir).expanduser()
         if not _valid(root):
-            raise ResourceError(f"{root} enthält keine dvb-i-tools-Schemas (schemas/, res/)")
-        return Resources(root, "lokal")
+            raise ResourceError(f"{root} does not contain dvb-i-tools schemas (schemas/, res/)")
+        return Resources(root, "local")
     root = cache_root() / f"dvb-i-tools-{ref[:12]}"
     if _valid(root):
         return Resources(root, ref)
     if not allow_download:
-        raise ResourceError(f"Schemas fehlen unter {root}. Bitte 'dvbi-check resources update' ausführen.")
+        raise ResourceError(f"Schemas missing in {root}. Please run 'dvbi-check resources update'.")
     download(root, ref)
     return Resources(root, ref)
 
 
 def download(target: Path, ref: str = PINNED_REF) -> Path:
-    """Lädt schemas/ und res/ aus dem GitHub-Archiv; Fallback: git."""
+    """Downloads schemas/ and res/ from the GitHub archive; fallback: git."""
     target = Path(target)
     tmp = target.with_suffix(".tmp")
     shutil.rmtree(tmp, ignore_errors=True)
@@ -104,9 +104,9 @@ def download(target: Path, ref: str = PINNED_REF) -> Path:
             try:
                 _download_git(tmp, ref)
             except Exception as e_git:  # noqa: BLE001
-                raise ResourceError(f"Download fehlgeschlagen (Archiv: {e_tar}; git: {e_git})") from e_git
+                raise ResourceError(f"Download failed (archive: {e_tar}; git: {e_git})") from e_git
         if not _valid(tmp):
-            raise ResourceError("Heruntergeladenes Archiv enthält keine Schemas")
+            raise ResourceError("Downloaded archive does not contain schemas")
         shutil.rmtree(target, ignore_errors=True)
         tmp.rename(target)
     finally:
@@ -169,7 +169,7 @@ def load_classification_schemes(cs_dir: str) -> dict[str, set[str]]:
         for t in cs.iter():
             if isinstance(t.tag, str) and t.tag.endswith("Term") and t.get("termID"):
                 s.add(t.get("termID"))
-    # Schemes, die nicht als Datei vorliegen (A177 Annex C, HowRelatedCS)
+    # schemes not available as files (A177 Annex C, HowRelatedCS)
     for year in ("2019", "2020", "2021"):
         terms.setdefault(f"urn:dvb:metadata:cs:HowRelatedCS:{year}", set()).update(
             {"1000.1", "1000.2", "1001.1", "1001.2", "1001.3", "1002.1"})

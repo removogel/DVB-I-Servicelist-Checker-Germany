@@ -1,8 +1,8 @@
-"""Prüfung der Stream-Manifeste (DASH-MPDs, optional HLS) der ServiceInstances.
+"""Checks of the stream manifests (DASH MPDs, optionally HLS) of the ServiceInstances.
 
-Grundlagen: A177r6 DASHDeliveryParameters, DVB-DASH (ETSI TS 103 285),
-DTVP IT-3 (DVB-DASH 2014 Profil, Codecs) und DVB-I Book Germany 7.3
-(Mindestqualität 960x540p, > 2,5 Mbit/s).
+Basis: A177r6 DASHDeliveryParameters, DVB-DASH (ETSI TS 103 285),
+DTVP IT-3 (DVB-DASH 2014 profile, codecs) and DVB-I Book Germany 7.3
+(minimum quality 960x540p, > 2.5 Mbit/s).
 """
 from __future__ import annotations
 
@@ -49,7 +49,7 @@ def _all(el, name):
 
 
 def _inherit(rep_el, attr):
-    """Attribut von Representation, sonst AdaptationSet."""
+    """Attribute from Representation, otherwise from AdaptationSet."""
     v = rep_el.get(attr)
     if v is None and rep_el.getparent() is not None:
         v = rep_el.getparent().get(attr)
@@ -60,46 +60,46 @@ def check_dash(ctx: Context, url: str, is_tv: bool) -> MpdReport:
     rep = MpdReport(url, "dash")
     cfg = ctx.cfg
     if url.startswith("http://"):
-        rep.add("MPD-HTTPS", Severity.WARNING, "MPD-URL ohne HTTPS")
+        rep.add("MPD-HTTPS", Severity.WARNING, "MPD URL without HTTPS")
     r = ctx.client.get(url, use_cache=True)
     rep.status, rep.elapsed, rep.content_type, rep.bytes = r.status, r.elapsed, r.content_type, len(r.content)
     if not r.ok:
-        rep.add("MPD-HTTP", Severity.ERROR, "MPD nicht abrufbar", detail=r.describe())
+        rep.add("MPD-HTTP", Severity.ERROR, "MPD not retrievable", detail=r.describe())
         return rep
     if r.elapsed > cfg.mpd_slow_seconds:
-        rep.add("MPD-SLOW", Severity.WARNING, f"MPD-Antwort langsamer als {cfg.mpd_slow_seconds} s",
+        rep.add("MPD-SLOW", Severity.WARNING, f"MPD response slower than {cfg.mpd_slow_seconds} s",
                 detail=f"{r.elapsed:.2f} s")
     if rep.content_type != DASH_CT:
-        rep.add("MPD-CT", Severity.WARNING, f"Content-Type „{rep.content_type or '(leer)'}“ statt {DASH_CT}",
+        rep.add("MPD-CT", Severity.WARNING, f"Content-Type '{rep.content_type or '(empty)'}' instead of {DASH_CT}",
                 ref=REF_DVB)
     try:
         root = etree.fromstring(r.content, etree.XMLParser(no_network=True, resolve_entities=False, huge_tree=True))
     except etree.XMLSyntaxError as e:
-        rep.add("MPD-XML", Severity.ERROR, "MPD ist kein wohlgeformtes XML", detail=str(e))
+        rep.add("MPD-XML", Severity.ERROR, "MPD is not well-formed XML", detail=str(e))
         return rep
     q = etree.QName(root)
     if q.localname != "MPD" or q.namespace != MPD_NS:
-        rep.add("MPD-ROOT", Severity.ERROR, f"Root-Element ist nicht MPD im Namespace {MPD_NS}", detail=root.tag)
+        rep.add("MPD-ROOT", Severity.ERROR, f"Root element is not MPD in namespace {MPD_NS}", detail=root.tag)
         return rep
     mtype = root.get("type", "static")
     profiles = [p.strip() for p in (root.get("profiles") or "").split(",") if p.strip()]
     rep.info.update({"type": mtype, "profiles": profiles})
     if not any(p in DVB_PROFILES for p in profiles):
-        rep.add("MPD-PROFILE", Severity.WARNING, "MPD signalisiert kein DVB-DASH-Profil",
-                ref="DTVP IT-3 (DVB-DASH 2014) / " + REF_DVB, detail=", ".join(profiles) or "(keine @profiles)")
+        rep.add("MPD-PROFILE", Severity.WARNING, "MPD does not signal a DVB-DASH profile",
+                ref="DTVP IT-3 (DVB-DASH 2014) / " + REF_DVB, detail=", ".join(profiles) or "(no @profiles)")
     if mtype != "dynamic":
-        rep.add("MPD-STATIC", Severity.WARNING, "MPD ist nicht @type=\"dynamic\" (für lineare Services erwartet)",
-                ref="A177 (lineare Services)", detail=f"type={mtype}")
+        rep.add("MPD-STATIC", Severity.WARNING, "MPD is not @type=\"dynamic\" (expected for linear services)",
+                ref="A177 (linear services)", detail=f"type={mtype}")
     else:
         if not root.get("availabilityStartTime"):
-            rep.add("MPD-AST", Severity.ERROR, "Dynamisches MPD ohne @availabilityStartTime", ref="ISO/IEC 23009-1")
+            rep.add("MPD-AST", Severity.ERROR, "Dynamic MPD without @availabilityStartTime", ref="ISO/IEC 23009-1")
         if root.find(f"{{{MPD_NS}}}UTCTiming") is None:
-            rep.add("MPD-UTC", Severity.WARNING, "Dynamisches MPD ohne UTCTiming-Element", ref=REF_DVB)
+            rep.add("MPD-UTC", Severity.WARNING, "Dynamic MPD without UTCTiming element", ref=REF_DVB)
         if not root.get("minimumUpdatePeriod") and not root.get("timeShiftBufferDepth"):
-            rep.add("MPD-MUP", Severity.INFO, "Weder @minimumUpdatePeriod noch @timeShiftBufferDepth gesetzt")
+            rep.add("MPD-MUP", Severity.INFO, "Neither @minimumUpdatePeriod nor @timeShiftBufferDepth set")
     periods = list(root.iterfind(f"{{{MPD_NS}}}Period"))
     if not periods:
-        rep.add("MPD-PERIOD", Severity.ERROR, "MPD ohne Period")
+        rep.add("MPD-PERIOD", Severity.ERROR, "MPD without Period")
         return rep
     rep.info["periods"] = len(periods)
 
@@ -133,31 +133,31 @@ def check_dash(ctx: Context, url: str, is_tv: bool) -> MpdReport:
     unknown = [c for c in codecs if c not in VIDEO_CODECS.values() and c not in AUDIO_CODECS.values()
                and c not in ("stpp", "wvtt")]
     if unknown:
-        rep.add("MPD-CODEC", Severity.INFO, "Codec außerhalb der DTVP-Anforderungen", ref="DTVP IT-3",
+        rep.add("MPD-CODEC", Severity.INFO, "Codec outside the DTVP requirements", ref="DTVP IT-3",
                 detail=", ".join(unknown))
     for name in codecs:
         if name in ("AV1", "VP9", "VVC", "AC-4", "MPEG-H", "Opus"):
-            rep.add("MPD-CODEC-OPT", Severity.WARNING, f"{name} wird von DTVP-Receivern nicht verpflichtend unterstützt",
-                    ref="DTVP IT-3", detail="nur zulässig, wenn zusätzlich AVC/HEVC bzw. AAC/E-AC-3 angeboten wird")
+            rep.add("MPD-CODEC-OPT", Severity.WARNING, f"{name} is not mandatory for DTVP receivers",
+                    ref="DTVP IT-3", detail="only acceptable if AVC/HEVC or AAC/E-AC-3 is offered as well")
     if drm:
-        rep.add("MPD-DRM", Severity.INFO, "MPD enthält ContentProtection (DRM)",
-                ref="Book 11.3 (Wiedergabe über Linked App 1.2)", detail=", ".join(sorted(drm)))
+        rep.add("MPD-DRM", Severity.INFO, "MPD contains ContentProtection (DRM)",
+                ref="Book 11.3 (playback via linked application 1.2)", detail=", ".join(sorted(drm)))
     if is_tv:
         if not video:
-            rep.add("MPD-NOVIDEO", Severity.ERROR, "TV-Service, aber MPD enthält keine Video-Representation")
+            rep.add("MPD-NOVIDEO", Severity.ERROR, "TV service, but MPD contains no video Representation")
         else:
             w, h = rep.info["video_max"]
             if w < cfg.mpd_min_width or h < cfg.mpd_min_height:
                 rep.add("MPD-QUALITY", Severity.WARNING,
-                        f"Höchste Videoauflösung unter {cfg.mpd_min_width}×{cfg.mpd_min_height}",
-                        ref="Book 7.3 (Mindestqualität Broadband)", detail=f"{w}×{h}")
+                        f"Highest video resolution below {cfg.mpd_min_width}×{cfg.mpd_min_height}",
+                        ref="Book 7.3 (broadband minimum quality)", detail=f"{w}×{h}")
             if rep.info["video_max_bandwidth"] and rep.info["video_max_bandwidth"] < cfg.mpd_min_bandwidth:
                 rep.add("MPD-BITRATE", Severity.WARNING,
-                        f"Höchste Video-Bitrate unter {cfg.mpd_min_bandwidth / 1e6:.1f} Mbit/s".replace(".", ","),
-                        ref="Book 7.3 (Mindestqualität Broadband)",
-                        detail=f"{rep.info['video_max_bandwidth'] / 1e6:.2f} Mbit/s".replace(".", ","))
+                        f"Highest video bitrate below {cfg.mpd_min_bandwidth / 1e6:.1f} Mbit/s",
+                        ref="Book 7.3 (broadband minimum quality)",
+                        detail=f"{rep.info['video_max_bandwidth'] / 1e6:.2f} Mbit/s")
     if not audio:
-        rep.add("MPD-NOAUDIO", Severity.WARNING, "MPD enthält keine Audio-Representation")
+        rep.add("MPD-NOAUDIO", Severity.WARNING, "MPD contains no audio Representation")
     return rep
 
 
@@ -166,9 +166,9 @@ def check_hls(ctx: Context, url: str) -> MpdReport:
     r = ctx.client.get(url)
     rep.status, rep.elapsed, rep.content_type, rep.bytes = r.status, r.elapsed, r.content_type, len(r.content)
     if not r.ok:
-        rep.add("HLS-HTTP", Severity.ERROR, "HLS-Playlist nicht abrufbar", detail=r.describe())
+        rep.add("HLS-HTTP", Severity.ERROR, "HLS playlist not retrievable", detail=r.describe())
     elif not r.content.lstrip().startswith(b"#EXTM3U"):
-        rep.add("HLS-FORMAT", Severity.ERROR, "Antwort ist keine M3U8-Playlist (#EXTM3U fehlt)")
+        rep.add("HLS-FORMAT", Severity.ERROR, "Response is not an M3U8 playlist (#EXTM3U missing)")
     return rep
 
 
@@ -194,7 +194,7 @@ def run(ctx: Context) -> ModuleResult:
     f = Findings("mpd")
     with Timer() as t:
         if ctx.offline:
-            res.skipped = "Offline-Modus"
+            res.skipped = "Offline mode"
         else:
             dash, hls = collect(ctx)
             with ThreadPoolExecutor(max_workers=ctx.cfg.workers) as ex:

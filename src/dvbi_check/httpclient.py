@@ -1,4 +1,4 @@
-"""Thread-sicherer HTTP-Client mit Cache, Retries und Zeitmessung."""
+"""Thread-safe HTTP client with cache, retries and timing."""
 from __future__ import annotations
 
 import threading
@@ -32,12 +32,12 @@ class HttpResult:
 
     def describe(self) -> str:
         if self.error:
-            return f"Fehler: {self.error}"
-        return f"HTTP {self.status}, {len(self.content)} Bytes, {self.elapsed:.2f} s"
+            return f"Error: {self.error}"
+        return f"HTTP {self.status}, {len(self.content)} bytes, {self.elapsed:.2f} s"
 
 
 def add_query(url: str, **params) -> str:
-    """Hängt Query-Parameter an eine URL an, auch wenn sie schon welche hat."""
+    """Appends query parameters to a URL, even if it already has some."""
     parts = urlsplit(url)
     q = parse_qsl(parts.query, keep_blank_values=True)
     q.extend((k, str(v)) for k, v in params.items() if v is not None)
@@ -93,7 +93,7 @@ class HttpClient:
                         r.close()
                         return HttpResult(url, r.status_code, {k.lower(): v for k, v in r.headers.items()},
                                           b"".join(chunks), time.perf_counter() - t0,
-                                          f"Antwort größer als {self.max_bytes} Bytes, abgebrochen")
+                                          f"Response larger than {self.max_bytes} bytes, aborted")
                     chunks.append(chunk)
                 return HttpResult(url, r.status_code, {k.lower(): v for k, v in r.headers.items()},
                                   b"".join(chunks), time.perf_counter() - t0)

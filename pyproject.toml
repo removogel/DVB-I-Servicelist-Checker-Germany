@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "dvbi-check"
 version = "0.1.0"
-description = "Prüfwerkzeug für DVB-I Service Lists (A177r6) nach DVB-I Book Germany und DTVP-Implementierungsprofil"
+description = "Validation tool for DVB-I service lists (A177r6) according to DVB-I Book Germany and the DTVP implementation profile"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [

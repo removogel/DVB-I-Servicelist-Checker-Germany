@@ -131,8 +131,9 @@ wrong HowRelatedCS version, invalid application contentType).
   (`DE-BB`, `DE-POPUP-OOS`, list logo in `images`) only consider permitted locations.
 - **Scope**: this is not a full port of the reference validator; see README "Scope".
 - **Reference validator (`refval`)** is opt-in (`refval_url`), because it sends the whole list
-  to a third-party server. Its REST handler ignores `variants` (pinned source), so DE relaxations
-  are applied by dvbi-check (`DE_RELAXED` in `refval.py`). The mock in `tests/mockserver.py`
+  to a third-party server. The DE variant is requested via the header `X-variants: DE` (POST;
+  `?variants=DE` is for GET) – supported by dvb-i-tools since 2026-10-22. `refval_relax_de` is a
+  fallback for older instances (`DE_RELAXED` in `refval.py`). The mock in `tests/mockserver.py`
   mimics `/validate_sl_json?results=all`; tests never call a real validator.
 - **Not checkable**: ordering by AGF/genre/alphabet, pop-up quotas, correctness of
   accessibility signalling, segment playability, functionality of apps.

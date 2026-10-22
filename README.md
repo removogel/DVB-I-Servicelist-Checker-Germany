@@ -113,9 +113,11 @@ schema are then reported as warnings, because strictly validating clients might 
 - The `refval` module POSTs the already loaded list to `<refval_url>/validate_sl_json?results=all`
   (so it also works for lists that are only delivered to whitelisted User-Agents). The list is
   re-serialised with indentation so that the validator's line numbers can be mapped to services.
-  The REST interface validates against the standard schema; findings that the German profile
-  explicitly permits (DTVP IT-11/IT-12) are downgraded to info. The module is opt-in because it
-  sends the complete list to a third-party server.
+  With the `de` profile it requests the German variant via the header `X-variants: DE`
+  (supported by dvb-i-tools since 2026-10-22). For older validator instances that ignore the
+  variant, `refval_relax_de = true` downgrades findings that the German profile explicitly
+  permits (DTVP IT-11/IT-12) to info. The module is opt-in because it sends the complete list to
+  a third-party server.
 - HTTP entry URLs of HbbTV applications in XML AITs are common practice and are deliberately
   not flagged.
 

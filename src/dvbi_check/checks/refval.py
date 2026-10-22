@@ -4,10 +4,12 @@ The service list that dvbi-check has already loaded is POSTed as XML to
 `<refval_url>/validate_sl_json?results=all`. Posting (rather than letting the validator fetch
 the URL itself) also works for lists that are only delivered to whitelisted User-Agents.
 
-Notes taken from the validator source (pinned revision, see resources.PINNED_REF):
-- The REST handler does not evaluate the `variants` parameter, i.e. it validates against the
-  standard A177 schema, not the German profile schema. Findings that the German profile
-  explicitly permits are therefore downgraded to INFO when profile="de" (same as SI05/SI06).
+Notes from the validator source (dvb-i-tools as of 2026-10-22, commit 7277df3 or later):
+- The German profile variant is requested with `?variants=DE` for GET and with the HTTP
+  header `X-variants: DE` for POST. dvbi-check POSTs, so it sends the header when profile="de".
+- Older validator instances ignore the variant and validate against the standard schema only.
+  For those, `refval_relax_de = true` makes dvbi-check downgrade the findings that the German
+  profile explicitly permits (DTVP IT-11/IT-12) to INFO.
 - The list is re-serialised with indentation before posting so that the line numbers in the
   validator's response can be mapped back to services.
 
@@ -27,7 +29,8 @@ from ..sl import ServiceListDoc
 from . import Context
 
 REF = "DVB-I reference validator"
-# Standard-schema findings that the German profile explicitly permits (DTVP IT-11/IT-12)
+# Standard-schema findings that the German profile explicitly permits (DTVP IT-11/IT-12);
+# only used with refval_relax_de for validator instances that ignore X-variants
 DE_RELAXED = re.compile(r"NetworkID|networkID|origNetId|tsId", re.I)
 
 
@@ -78,9 +81,12 @@ def _run(ctx: Context, base: str, f: Findings, res: ModuleResult) -> None:
     pretty = _pretty(ctx.doc)
     pdoc = ServiceListDoc(pretty, ctx.doc.source)
     lines = _line_index(pdoc)
-    url = add_query(f"{base}/validate_sl_json", results="all", variants="DE" if ctx.cfg.profile == "de" else None)
-    r = ctx.client.post(url, pretty, "application/xml", timeout=ctx.cfg.refval_timeout)
-    res.stats = {"endpoint": url, "http_status": r.status, "elapsed_s": round(r.elapsed, 1)}
+    de = ctx.cfg.profile == "de"
+    url = add_query(f"{base}/validate_sl_json", results="all")
+    headers = {"X-variants": "DE"} if de else {}
+    r = ctx.client.post(url, pretty, "application/xml", timeout=ctx.cfg.refval_timeout, headers=headers)
+    res.stats = {"endpoint": url, "variant": "DE" if de else "standard", "http_status": r.status,
+                 "elapsed_s": round(r.elapsed, 1)}
     if not r.ok:
         f.error("RV-HTTP", "Reference validator not reachable or request failed", ref=REF, detail=f"{r.describe()} · {url}")
         return
@@ -97,7 +103,7 @@ def _run(ctx: Context, base: str, f: Findings, res: ModuleResult) -> None:
         if "errs" in o:
             errs = o["errs"] or {}
     descriptions = {d.get("code"): d for d in errs.get("errorDescriptions", []) if isinstance(d, dict)}
-    de = ctx.cfg.profile == "de"
+    relax = de and ctx.cfg.refval_relax_de
     counts = {"errors": 0, "warnings": 0, "informationals": 0, "downgraded": 0}
     for key, sev in (("fatals", Severity.ERROR), ("errors", Severity.ERROR),
                      ("warnings", Severity.WARNING), ("informationals", Severity.INFO)):
@@ -114,7 +120,7 @@ def _run(ctx: Context, base: str, f: Findings, res: ModuleResult) -> None:
             if desc.get("description"):
                 detail += (" · " if detail else "") + desc["description"][:300]
             this_sev = sev
-            if de and sev != Severity.INFO and DE_RELAXED.search(msg):
+            if relax and sev != Severity.INFO and DE_RELAXED.search(msg):
                 this_sev = Severity.INFO
                 msg += " – permitted in the DE profile (DTVP IT-11/IT-12)"
                 counts["downgraded"] += 1
@@ -123,6 +129,3 @@ def _run(ctx: Context, base: str, f: Findings, res: ModuleResult) -> None:
                   service=svc.uid if svc else None, subject=svc.name if svc else (f"line {line}" if line else ""),
                   detail=detail)
     res.stats.update(counts)
-    if de:
-        f.info("RV-VARIANT", "The reference validator's REST interface validates against the standard schema; "
-                             "German profile relaxations are applied by dvbi-check", ref=REF)

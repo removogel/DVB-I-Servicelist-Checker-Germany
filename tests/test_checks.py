@@ -22,7 +22,7 @@ from dvbi_check.httpclient import add_query  # noqa: E402
 from dvbi_check.report import write_reports  # noqa: E402
 from dvbi_check.resources import ResourceError, locate  # noqa: E402
 from dvbi_check.runner import run  # noqa: E402
-from mockserver import MockServer  # noqa: E402
+from mockserver import Handler, MockServer  # noqa: E402
 
 FIXTURE = HERE / "fixtures" / "mini_sl.xml"
 
@@ -195,9 +195,10 @@ class TestRefVal(TestFullRun):
         self.assertEqual(err.severity.name, "ERROR")
         self.assertEqual(err.service, "tag:example.org,2026:one")   # line number mapped back to the service
         self.assertEqual(err.ref, "A177 table 15")
-        warn = by_code(self.rr, "refval", "RV-SL998")[0]
-        self.assertEqual(warn.severity.name, "INFO")                 # relaxed by the DE profile
-        self.assertIn("variants=DE", rv.stats["endpoint"])
+        # DE variant requested via header; the (mocked) validator then omits the NetworkID warning
+        self.assertEqual(rv.stats["variant"], "DE")
+        self.assertEqual(by_code(self.rr, "refval", "RV-SL998"), [])
+        self.assertEqual(Handler.last_refval_headers.get("X-variants"), "DE")
 
 
 class TestOffline(unittest.TestCase):

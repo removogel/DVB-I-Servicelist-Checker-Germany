@@ -68,6 +68,7 @@ class Config:
     # DVB-I reference validator (opt-in: sends the service list to this server)
     refval_url: str | None = None           # e.g. "https://<host>:<port>" of a dvb-i-tools instance
     refval_timeout: float = 300.0
+    refval_relax_de: bool = False           # only for validator instances that ignore X-variants: DE
 
     @classmethod
     def load(cls, path: str | Path | None) -> "Config":

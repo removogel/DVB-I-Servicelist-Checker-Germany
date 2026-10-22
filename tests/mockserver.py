@@ -110,6 +110,7 @@ def mpd(dynamic=True, dvb=True, width=1280, height=720, bw=5000000, video=True) 
 
 class Handler(BaseHTTPRequestHandler):
     base = ""
+    last_refval_headers: dict = {}
 
     def log_message(self, *a):  # quiet
         pass
@@ -127,14 +128,17 @@ class Handler(BaseHTTPRequestHandler):
         if u.path != "/validate_sl_json":
             return self.send(b"not found", "text/plain", 404)
         body = self.rfile.read(int(self.headers.get("Content-Length", 0))).decode("utf-8")
+        Handler.last_refval_headers = dict(self.headers)
+        de = (self.headers.get("X-variants") or "").lower() == "de"
         line = next(i for i, l in enumerate(body.splitlines(), 1)
                     if "<UniqueIdentifier>tag:example.org,2026:one<" in l)
         errs = {
             "fatals": [],
             "errors": [{"type": "(E)", "code": "SL999", "message": "synthetic reference validator error",
                         "element": "<UniqueIdentifier>tag:example.org,2026:one</UniqueIdentifier>", "line": line}],
-            "warnings": [{"type": "(W)", "code": "SL998",
-                          "message": "DVBCDeliveryParameters without NetworkID", "line": 1}],
+            # the DE variant permits a missing NetworkID, so only the standard variant reports it
+            "warnings": [] if de else [{"type": "(W)", "code": "SL998",
+                                        "message": "DVBCDeliveryParameters without NetworkID", "line": 1}],
             "informationals": [],
             "errorDescriptions": [{"code": "SL999", "description": "test description", "clause": "A177 table 15"}],
         }

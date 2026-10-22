@@ -57,3 +57,6 @@ check_hls = true
 # The complete service list is POSTed to this server – only enable it if that is acceptable.
 # refval_url = "https://<host>:<port>"
 refval_timeout = 300.0
+# The DE variant is requested via the header "X-variants: DE" (dvb-i-tools from 2026-10-22).
+# For older validator instances that ignore it, let dvbi-check relax DE-permitted findings:
+refval_relax_de = false

@@ -7,12 +7,20 @@ It produces a report as HTML, JSON and CSV.
 | Module | Checks |
 |---|---|
 | `schema` | XSD validation against the A177 standard schema and – for A177r6 – the German profile schema; Content-Type of the delivery |
-| `a177` | Semantics according to the standard: unique IDs, tag: URIs, classification scheme values, regions and postcode overlaps, LCN references, delivery parameters, logos, content guide references |
+| `a177` | Semantics according to the standard: unique IDs, tag: URIs, classification scheme values, placement of `RelatedMaterial` (logos, banners, linked applications) per A177 tables 14/15/16/20 and their application locators, regions and postcode overlaps, LCN references, delivery parameters, logos, content guide references |
 | `profile` | Completeness according to the Book and DTVP: "M" fields from IT-6, DVB-S direct tuning (IT-13), broadband instance (Book 7.3), DRM via linked application (Book 11.3), content guide proxy (Book 12), LCN plan according to Book 6.6 (blocks, LCN 7/41–49, 50/51, radio block, end channel 3999), pop-up channels (Book 6.9), region depth (Book 10.2); for URL sources also invalid postcode handling (IT-5) and conditional GET (IT-18) |
 | `cg` | Content guide endpoints (TV-Anytime): now/next, a time window for every day from −7 to +7, programme info; TVA XSD; mandatory fields according to DTVP IT-6 (tables 41–64); daily coverage, gaps, overlaps; sample of EPG images |
 | `ait` | XML AITs of linked applications: reachability, Content-Type `application/vnd.dvb.ait+xml`, structure according to ETSI TS 102 809 (namespace, orgId/appId, application type `application/vnd.hbbtv.xhtml+xml`, controlCode, mhpVersion, HTTP transport, applicationLocation), AUTOSTART for linked apps, reachability of the entry page; optional XSD validation with `--ait-xsd` |
 | `mpd` | DASH manifests: reachability, response time, Content-Type, MPD structure, DVB-DASH profile (DTVP IT-3), `type="dynamic"` with `availabilityStartTime` and UTCTiming, codecs, DRM, minimum quality for TV according to Book 7.3 (960×540, > 2.5 Mbit/s); HLS playlists for reachability |
 | `images` | Logo endpoints: reachability, Content-Type, default width 320 px, file size, mandatory variants `16x9_colour`, `16x9_colour_light`, `16x9_colour_dark`, transparency, width parameter `?w=` |
+
+## Scope
+
+`dvbi-check` focuses on the German profile (DVB-I Book Germany, DTVP) and on the reachability
+and content of the referenced endpoints (content guide, logos, AITs, manifests). It is **not** a
+complete port of the [DVB-I reference validator](https://github.com/paulhiggs/dvb-i-tools),
+which covers further A177 details (e.g. accessibility attributes, signatures and digests, more
+cardinality rules). For a complete standard conformance check, run both tools.
 
 ## Installation
 

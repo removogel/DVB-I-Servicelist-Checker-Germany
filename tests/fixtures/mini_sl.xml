@@ -5,6 +5,11 @@
   id="tag:example.org,2026:testlist" version="1" xml:lang="en">
   <Name>Test list</Name>
   <ProviderName>Example</ProviderName>
+  <!-- RM01: linked application is not permitted at service list level -->
+  <RelatedMaterial>
+    <tva:HowRelated href="urn:dvb:metadata:cs:LinkedApplicationCS:2019:1.2"/>
+    <tva:MediaLocator><tva:MediaUri contentType="application/vnd.dvb.ait+xml">{BASE}/ait/ok.aitx</tva:MediaUri></tva:MediaLocator>
+  </RelatedMaterial>
   <RegionList version="1">
     <Region countryCodes="DEU" regionID="de">
       <RegionName>Deutschland</RegionName>
@@ -44,6 +49,11 @@
     <ContentGuideSource CGSID="cg1">
       <Name>Test-EPG</Name>
       <ProviderName>Example</ProviderName>
+      <!-- RM04: only a content guide source logo (1002.1) is permitted here -->
+      <RelatedMaterial>
+        <tva:HowRelated href="urn:dvb:metadata:cs:HowRelatedCS:2021:1001.2"/>
+        <tva:MediaLocator><tva:MediaUri contentType="image/png">{BASE}/logo/ok.png</tva:MediaUri></tva:MediaLocator>
+      </RelatedMaterial>
       <ScheduleInfoEndpoint contentType="application/xml"><dvbi-types:URI>{BASE}/cg/schedule</dvbi-types:URI></ScheduleInfoEndpoint>
       <ProgramInfoEndpoint contentType="application/xml"><dvbi-types:URI>{BASE}/cg/program</dvbi-types:URI></ProgramInfoEndpoint>
     </ContentGuideSource>
@@ -89,6 +99,10 @@
       <tva:HowRelated href="urn:dvb:metadata:cs:HowRelatedCS:2021:1001.2"/>
       <tva:MediaLocator><tva:MediaUri contentType="image/jpeg">{BASE}/logo/bad.png</tva:MediaUri></tva:MediaLocator>
     </RelatedMaterial>
+    <RelatedMaterial>
+      <tva:HowRelated href="urn:dvb:metadata:cs:LinkedApplicationCS:2019:1.2"/>
+      <tva:MediaLocator><tva:MediaUri contentType="application/vnd.dvb.ait+xml">{BASE}/ait/ok.aitx</tva:MediaUri></tva:MediaLocator>
+    </RelatedMaterial>
     <ServiceType href="urn:dvb:metadata:cs:ServiceTypeCS:2019:linear"/>
     <ContentGuideSourceRef>cg1</ContentGuideSourceRef>
   </Service>
@@ -106,6 +120,11 @@
       <DASHDeliveryParameters><UriBasedLocation contentType="application/dash+xml"><dvbi-types:URI>{BASE}/mpd/live.mpd</dvbi-types:URI></UriBasedLocation></DASHDeliveryParameters>
     </ServiceInstance>
     <ServiceName>ARD SR</ServiceName><ProviderName>ARD</ProviderName>
+    <!-- RM06: wrong HowRelatedCS version for A177r6 -->
+    <RelatedMaterial>
+      <tva:HowRelated href="urn:dvb:metadata:cs:HowRelatedCS:2019:1001.2"/>
+      <tva:MediaLocator><tva:MediaUri contentType="image/png">{BASE}/logo/ok.png</tva:MediaUri></tva:MediaLocator>
+    </RelatedMaterial>
     <ServiceType href="urn:dvb:metadata:cs:ServiceTypeCS:2019:linear"/>
   </Service>
   <Service version="1">
@@ -119,6 +138,11 @@
   <Service version="1">
     <UniqueIdentifier>tag:example.org,2026:popup</UniqueIdentifier>
     <ServiceInstance priority="1"><DisplayName>Event</DisplayName>
+      <!-- RM03: out-of-service banner is not permitted in a service instance -->
+      <RelatedMaterial>
+        <tva:HowRelated href="urn:dvb:metadata:cs:HowRelatedCS:2021:1000.1"/>
+        <tva:MediaLocator><tva:MediaUri contentType="image/png">{BASE}/logo/ok.png</tva:MediaUri></tva:MediaLocator>
+      </RelatedMaterial>
       <RelatedMaterial>
         <tva:HowRelated href="urn:dvb:metadata:cs:LinkedApplicationCS:2019:1.2"/>
         <tva:MediaLocator><tva:MediaUri contentType="application/vnd.dvb.ait+xml">{BASE}/ait/ok.aitx</tva:MediaUri></tva:MediaLocator>
@@ -133,6 +157,11 @@
       <DASHDeliveryParameters><UriBasedLocation contentType="application/dash+xml"><dvbi-types:URI>{BASE}/mpd/radio.mpd</dvbi-types:URI></UriBasedLocation></DASHDeliveryParameters>
     </ServiceInstance>
     <ServiceName>Radio Three</ServiceName><ProviderName>Example</ProviderName>
+    <!-- RM05: text/plain is not a permitted application type -->
+    <RelatedMaterial>
+      <tva:HowRelated href="urn:dvb:metadata:cs:LinkedApplicationCS:2019:1.1"/>
+      <tva:MediaLocator><tva:MediaUri contentType="text/plain">{BASE}/app/index.html</tva:MediaUri></tva:MediaLocator>
+    </RelatedMaterial>
     <ServiceType href="urn:dvb:metadata:cs:ServiceTypeCS:2019:linear"/>
     <ContentGuideSourceRef>cg1</ContentGuideSourceRef>
     <ContentGuideServiceRef>tag:example.org,2026:radio-gap</ContentGuideServiceRef>

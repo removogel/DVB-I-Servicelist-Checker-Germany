@@ -14,6 +14,7 @@ from PIL import Image, UnidentifiedImageError
 
 from ..httpclient import HttpClient, add_query
 from ..model import Findings, ModuleResult, Severity, Timer
+from ..sl import LIST_LOGO_HOWRELATED
 from . import Context
 
 Image.MAX_IMAGE_PIXELS = 40_000_000
@@ -164,6 +165,9 @@ def run(ctx: Context) -> ModuleResult:
                 for uri, ct in doc.logo_uris(s):
                     users[(uri, ct)].append(s)
             for rm in doc.xr("d:RelatedMaterial"):
+                hr = rm.find("t:HowRelated", doc.nsmap)
+                if hr is None or not LIST_LOGO_HOWRELATED.search(hr.get("href", "")):
+                    continue                  # only the service list logo, not agreement apps
                 for mu in rm.iterfind(".//t:MediaUri", doc.nsmap):
                     if mu.text:
                         users[(mu.text.strip(), mu.get("contentType", ""))]  # service list logo

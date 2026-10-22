@@ -136,6 +136,8 @@ def _delivery(ctx: Context, f: Findings) -> None:
                 broadband = True
             if "1.2" in doc.linked_apps(i):
                 broadband = app12 = True
+        if "1.2" in doc.linked_apps(s.el):   # linked app 1.2 signalled at service level
+            broadband = app12 = True
         if "end-of-service-list" in s.uid:
             continue
         if not broadband:
@@ -308,7 +310,8 @@ def _popups(ctx: Context, f: Findings) -> None:
         s = doc.by_uid.get(u)
         if s is None:
             continue
-        hrefs = [h.get("href", "") for h in s.el.iterfind(".//t:HowRelated", ns)]
+        # only counts when signalled at service level (A177 tables 15/16, as in the reference validator)
+        hrefs = [h.get("href", "") for h in s.el.findall("d:RelatedMaterial/t:HowRelated", ns)]
         if not any(OOS_BANNER_HOWRELATED.search(h) or OOS_APP.search(h) for h in hrefs):
             f.error("DE-POPUP-OOS", "Pop-up channel without out-of-service banner or app",
                     ref="Book 6.9, DTVP IT-6 (out-of-service banner 'M')", **_kw(s))

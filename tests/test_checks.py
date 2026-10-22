@@ -98,6 +98,25 @@ class TestFullRun(unittest.TestCase):
         m7 = by_code(self.rr, "profile", "DE-LCN-7MAP")[0]
         self.assertIn("ARD SR", m7.detail)
 
+    def test_related_material_placement(self):
+        rm = {(f.code, f.subject) for f in self.rr.module("a177").findings if f.code.startswith("RM")}
+        self.assertIn(("RM01", "ServiceList"), rm)          # linked app at list level
+        self.assertIn(("RM03", "Event Channel"), rm)        # out-of-service banner in instance
+        self.assertIn(("RM04", "cg1"), rm)                  # service logo in content guide source
+        self.assertIn(("RM05", "Radio Three"), rm)          # invalid application contentType
+        self.assertIn(("RM06", "ARD SR"), rm)               # HowRelatedCS:2019 in an r6 list
+        self.assertFalse({s for c, s in rm if s in ("One", "Two")},
+                         "correctly placed logos and linked apps must not be flagged")
+
+    def test_location_aware_profile_rules(self):
+        # linked app 1.2 at service level counts as broadband instance
+        self.assertNotIn("Two", [f.subject for f in by_code(self.rr, "profile", "DE-BB")])
+        # a misplaced out-of-service banner does not satisfy the pop-up requirement
+        self.assertIn("Event Channel", [f.subject for f in by_code(self.rr, "profile", "DE-POPUP-OOS")])
+        # only the service list logo is treated as an image, not list-level applications
+        urls = [i["url"] for i in self.rr.module("images").stats["images"]]
+        self.assertFalse([u for u in urls if u.endswith(".aitx")])
+
     def test_a177_relaxed_in_de_profile(self):
         for f in self.rr.module("a177").findings:
             if f.code.startswith(("SI05", "SI06-DVBC", "SI06-DVBT")):

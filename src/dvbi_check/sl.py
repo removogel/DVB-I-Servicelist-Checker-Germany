@@ -12,17 +12,26 @@ TVA_PREFIX = "urn:tva:metadata:"
 TYPES_PREFIX = "urn:dvb:metadata:servicediscovery-types:"
 XML_LANG = "{http://www.w3.org/XML/1998/namespace}lang"
 
-# Namespace-Jahr -> A177-Revision
+# namespace year -> A177 revision
 REVISIONS = {
     "2019": "A177 (r0)", "2020": "A177r1", "2021": "A177r2", "2022": "A177r3",
     "2022b": "A177r4", "2023": "A177r5", "2024": "A177r6", "2025": "A177r7", "2026": "A177r8",
 }
 
+REVISION_ORDER = ["2019", "2020", "2021", "2022", "2022b", "2023", "2024", "2025", "2026"]
+
 LOGO_HOWRELATED = re.compile(r"HowRelatedCS:20\d\d:1001\.2$")
 LIST_LOGO_HOWRELATED = re.compile(r"HowRelatedCS:20\d\d:1001\.1$")
-OOS_BANNER_HOWRELATED = re.compile(r"HowRelatedCS:20\d\d:1000\.1$")   # Out-of-Service-Banner
-OOS_APP = re.compile(r"LinkedApplicationCS:2019:2$")                      # Out-of-Service-App
+OOS_BANNER_HOWRELATED = re.compile(r"HowRelatedCS:20\d\d:1000\.1$")   # out-of-service banner
+OOS_APP = re.compile(r"LinkedApplicationCS:2019:2$")                      # out-of-service app
 LINKED_APP = re.compile(r"LinkedApplicationCS:2019:(1\.[12])$")
+_HOWRELATED = re.compile(r"^urn:dvb:metadata:cs:(HowRelatedCS|LinkedApplicationCS):\d{4}:(.+)$")
+
+
+def howrelated(href: str | None) -> tuple[str | None, str | None]:
+    """Splits a DVB HowRelated href into (scheme, term), e.g. ("LinkedApplicationCS", "1.2")."""
+    m = _HOWRELATED.match((href or "").strip())
+    return (m.group(1), m.group(2)) if m else (None, None)
 
 
 def safe_parser() -> etree.XMLParser:
@@ -182,9 +191,15 @@ class ServiceListDoc:
                         out.append((mu.text.strip(), mu.get("contentType", "")))
         return out
 
-    def linked_apps(self, inst) -> list[str]:
+    def rev_at_least(self, ns_year: str) -> bool:
+        """True if the document's schema revision is at least the given namespace year."""
+        order = REVISION_ORDER
+        return self.ns_year in order and order.index(self.ns_year) >= order.index(ns_year)
+
+    def linked_apps(self, el) -> list[str]:
+        """Linked application types (1.1/1.2) signalled directly on a Service or ServiceInstance."""
         out = []
-        for hr in inst.findall("d:RelatedMaterial/t:HowRelated", self.nsmap):
+        for hr in el.findall("d:RelatedMaterial/t:HowRelated", self.nsmap):
             m = LINKED_APP.search(hr.get("href", ""))
             if m:
                 out.append(m.group(1))

@@ -10,7 +10,7 @@ from collections import Counter, defaultdict
 
 from ..model import Findings, ModuleResult, Severity, Timer
 from ..resources import load_classification_schemes
-from ..sl import XML_LANG, local
+from ..sl import XML_LANG, howrelated, local
 from . import Context
 
 TAG_URI = re.compile(r"^tag:[A-Za-z0-9.\-@_]+,\d{4}(-\d{2}(-\d{2})?)?:.+$", re.I)
@@ -33,6 +33,7 @@ def run(ctx: Context) -> ModuleResult:
         _cg_sources(ctx, f)
         _services(ctx, f)
         _instances(ctx, f, de)
+        _related_material(ctx, f)
         _lcn(ctx, f)
         res.stats = {
             "services": len(doc.services),
@@ -248,11 +249,106 @@ def _instances(ctx: Context, f: Findings, de: bool) -> None:
                         f.error("SI08", "DASH UriBasedLocation with wrong contentType",
                                 detail=str(ul.get("contentType")), **kw)
         if not any_delivery:
-            apps = [a for i in insts for a in doc.linked_apps(i)]
+            apps = [a for i in insts for a in doc.linked_apps(i)] + doc.linked_apps(s.el)
             if "1.2" in apps:
                 f.info("SI02", "Only a linked application instance (type 1.2), no native delivery parameters", **kw)
             else:
                 f.warning("SI02", "No instance with delivery parameters and no linked application 1.2", **kw)
+
+
+# --------------------------------------------------------------------------
+# RelatedMaterial placement – mirrors the DVB-I reference validator (dvb-i-tools),
+# which cites A177 tables 14 (ServiceList), 15 (Service), 16 (ServiceInstance) and
+# 20 (ContentGuideSource).
+APP_CONTENT_TYPES = {"application/vnd.dvb.ait+xml", "text/html", "application/xhtml+xml", "application/xml"}
+LOCATION_REF = {"ServiceList": "A177 table 14", "Service": "A177 table 15",
+                "ServiceInstance": "A177 table 16", "ContentGuideSource": "A177 table 20"}
+
+
+def _permitted(doc, location: str) -> tuple[set[str], set[str]]:
+    """(HowRelatedCS terms, LinkedApplicationCS terms) permitted at a location for this revision."""
+    apps = {"1.1", "1.2"}
+    if doc.rev_at_least("2024"):      # A177r6: service provider app
+        apps.add("3")
+    if doc.rev_at_least("2025"):      # A177r7: app in series
+        apps.add("1.3")
+    if location == "ServiceList":
+        return {"1001.1"}, ({"4.1", "4.2", "4.3"} if doc.rev_at_least("2025") else set())
+    if location == "Service":
+        hr = {"1000.1", "1001.2"}
+        if doc.rev_at_least("2020"):
+            hr.add("1000.2")
+        if doc.rev_at_least("2021"):
+            hr.add("1001.3")
+        return hr, apps | {"2"}
+    if location == "ServiceInstance":
+        hr = {"1001.2"}
+        if doc.rev_at_least("2020"):
+            hr.add("1000.2")
+        if not doc.rev_at_least("2024"):  # out-of-service banner no longer permitted in instances from r6
+            hr.add("1000.1")
+        return hr, apps
+    if location == "ContentGuideSource":
+        return {"1002.1"}, set()
+    return set(), set()
+
+
+def _expected_cs_year(doc) -> str:
+    return "2021" if doc.rev_at_least("2022") else "2020" if doc.rev_at_least("2020") else "2019"
+
+
+def _related_material(ctx: Context, f: Findings) -> None:
+    doc, ns = ctx.doc, ctx.doc.nsmap
+    codes = {"ServiceList": "RM01", "Service": "RM02", "ServiceInstance": "RM03", "ContentGuideSource": "RM04"}
+    for rm in doc.root.iter(f"{{{doc.ns}}}RelatedMaterial"):
+        location = local(rm.getparent())
+        if location not in codes:
+            continue
+        svc = doc.service_of(rm)
+        kw = {"service": svc.uid if svc else None,
+              "subject": svc.name if svc else (rm.getparent().get("CGSID") or location)}
+        where = location + (f" priority {rm.getparent().get('priority')}" if location == "ServiceInstance" else "")
+        code, ref = codes[location], LOCATION_REF[location]
+        hr_el = rm.find("t:HowRelated", ns)
+        href = hr_el.get("href", "") if hr_el is not None else ""
+        if not href:
+            f.error(code, f"RelatedMaterial in {location} without HowRelated@href", ref=ref, detail=where, **kw)
+            continue
+        scheme, term = howrelated(href)
+        allowed_hr, allowed_apps = _permitted(doc, location)
+        if scheme == "HowRelatedCS":
+            year = href.split(":")[-2]
+            if term in allowed_hr and year != _expected_cs_year(doc):
+                f.error("RM06", f"HowRelatedCS:{year} is not valid for {doc.revision} "
+                                f"(expected HowRelatedCS:{_expected_cs_year(doc)})", ref=ref, detail=f"{where}: {href}", **kw)
+            ok = term in allowed_hr
+        elif scheme == "LinkedApplicationCS":
+            ok = term in allowed_apps
+        else:
+            ok = False
+        if not ok:
+            f.error(code, f"HowRelated value not permitted in {location}", ref=ref, detail=f"{where}: {href}", **kw)
+            continue
+        if scheme == "LinkedApplicationCS":
+            _check_app_locator(rm, href, term, where, kw, f, ns)
+
+
+def _check_app_locator(rm, href, term, where, kw, f, ns) -> None:
+    uris = rm.findall("t:MediaLocator/t:MediaUri", ns)
+    if not uris:
+        f.error("RM05", "Signalled application without MediaUri", ref="A177", detail=f"{where}: {href}", **kw)
+    for mu in uris:
+        url, ct = (mu.text or "").strip(), mu.get("contentType", "")
+        if ct and ct not in APP_CONTENT_TYPES:
+            f.error("RM05", "Application MediaUri@contentType is not a permitted application type", ref="A177",
+                    detail=f"{where}: contentType '{ct}' · {url}", **kw)
+        if term == "3" and ct and ct != "application/vnd.dvb.ait+xml":
+            f.error("RM05", "Service provider application (type 3) must use an XML AIT", ref="A177",
+                    detail=f"{where}: contentType '{ct}' · {url}", **kw)
+        if not re.match(r"^https?://\S+$", url):
+            f.error("RM05", "Application MediaUri is not a valid HTTP(S) URL", ref="A177", detail=f"{where}: {url!r}", **kw)
+        elif not url.isascii():
+            f.error("RM05", "Application MediaUri contains non-ASCII characters", ref="A177", detail=f"{where}: {url}", **kw)
 
 
 def _lcn(ctx: Context, f: Findings) -> None:

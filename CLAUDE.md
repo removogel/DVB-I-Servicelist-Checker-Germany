@@ -45,7 +45,7 @@ resources.py      pinned dvb-i-tools (PINNED_REF), schema mapping per namespace 
 model.py          Severity, Finding, Findings.add(), ModuleResult, MODULE_TITLES
 checks/
   schema.py       XSD standard + DE profile schema
-  a177.py         semantics according to the standard
+  a177.py         semantics according to the standard, incl. RelatedMaterial placement (RM*)
   profile_de.py   Book + DTVP, incl. LCN plan (Book 6.6) and server tests (IT-5, IT-18)
   contentguide.py TV-Anytime: now_next, day windows, programme info, EPG images
   images.py       logos: width, size, image_variant, ?w=
@@ -109,7 +109,9 @@ Error cases deliberately covered by the fixture: regional programme on LCN 7 and
 block 41–49 (`DE-LCN-ARD7`), wrong regional programme on LCN 7 (`DE-LCN-7MAP`), service in the
 radio block without `linear-radio`, pop-up without out-of-service banner, DVB-S without tuning
 parameters, empty content guide, logo with wrong width and ignored variants, faulty AIT,
-static MPD with insufficient quality, unreachable MPD.
+static MPD with insufficient quality, unreachable MPD, misplaced `RelatedMaterial` (linked app
+at list level, out-of-service banner in an instance, service logo in a content guide source,
+wrong HowRelatedCS version, invalid application contentType).
 
 ## Known assumptions and open points
 
@@ -123,6 +125,10 @@ static MPD with insufficient quality, unreachable MPD.
 - **XML AIT** is checked structurally; an official XSD is optional (`--ait-xsd`).
   Application entry URLs using `http://` are common practice and are deliberately **not**
   flagged (the former code `AIT-APP-HTTPS` was removed). Only their reachability is checked.
+- **RelatedMaterial placement** (`RM01`–`RM06`) mirrors the reference validator's rules per
+  location (A177 tables 14/15/16/20). Rules that depend on where something is signalled
+  (`DE-BB`, `DE-POPUP-OOS`, list logo in `images`) only consider permitted locations.
+- **Scope**: this is not a full port of the reference validator; see README "Scope".
 - **Not checkable**: ordering by AGF/genre/alphabet, pop-up quotas, correctness of
   accessibility signalling, segment playability, functionality of apps.
 - **Schema resources** are pinned to `resources.PINNED_REF`. When updating, run the tests and

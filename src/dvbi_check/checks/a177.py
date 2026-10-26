@@ -369,11 +369,10 @@ def _lcn(ctx: Context, f: Findings) -> None:
                             subject=label, detail=f"also in LCNTable #{combos[(r, p)]}")
                 else:
                     combos[(r, p)] = idx
-        chans, refs = Counter(), Counter()
+        chans = Counter()
         for l in t.findall("d:LCN", ns):
             ref, ch = l.get("serviceRef"), l.get("channelNumber")
             chans[ch] += 1
-            refs[ref] += 1
             in_any.add(ref)
             if ref not in doc.by_uid:
                 f.error("LC01", "LCN refers to an unknown service", subject=label, detail=f"LCN {ch} → {ref}")
@@ -383,11 +382,8 @@ def _lcn(ctx: Context, f: Findings) -> None:
         for ch, n in chans.items():
             if n > 1:
                 f.error("LC02", "Channel number assigned more than once", subject=label, detail=f"LCN {ch} {n}×")
-        for ref, n in refs.items():
-            if n > 1:
-                svc = doc.by_uid.get(ref)
-                f.warning("LC03", "Service listed more than once in the same LCNTable", service=ref,
-                          subject=svc.name if svc else ref, detail=f"{label}, {n}×")
+        # LC03 ("service listed more than once in the same LCNTable") was removed on request:
+        # A177 permits it. The German listing rule is covered by DE-LCN-DUP in profile_de.py.
     untargeted = [i for i, t in enumerate(doc.lcn_tables, 1) if t.find("d:TargetRegion", ns) is None]
     if len(untargeted) > 1:
         f.warning("LC05", "Several LCNTables without TargetRegion", detail=", ".join(f"#{i}" for i in untargeted))

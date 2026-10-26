@@ -256,10 +256,13 @@ def _event_fields(sc: ServiceCG, e: Event, where: str) -> None:
 
 
 def check_schedule_day(ctx, sc, ep, sid, day_start: datetime, offset: int) -> tuple[list[str], list]:
-    day_end = day_start + timedelta(days=1)
+    tz = day_start.tzinfo
+    dlabel = f"{WEEKDAYS[day_start.weekday()]} {day_start:%Y-%m-%d}"
+    # Local midnight to local midnight, computed in UTC: days with a DST change last 23 or 25 hours.
+    day_end = datetime.combine(day_start.date() + timedelta(days=1), time(0), tz).astimezone(timezone.utc)
+    day_start = day_start.astimezone(timezone.utc)
     url = add_query(ep, sid=sid, start=int(day_start.timestamp()), end=int(day_end.timestamp()))
     label = "Time window"
-    dlabel = f"{WEEKDAYS[day_start.weekday()]} {day_start:%Y-%m-%d}"
     doc = fetch_tva(ctx, sc, url, label, dlabel)
     days = sc.stats.setdefault("days", {})
     if doc is None:
@@ -297,7 +300,7 @@ def check_schedule_day(ctx, sc, ep, sid, day_start: datetime, offset: int) -> tu
                "Time window: no programme data for " + ("today or an upcoming day" if must else "a past day"),
                ref="DTVP IT-6 (today + 7 days 'shall', 7 days back 'should')", detail=f"{dlabel} · {url}")
     elif coverage < ctx.cfg.cg_min_coverage:
-        g = ", ".join(f"{a.astimezone(day_start.tzinfo):%H:%M}–{b.astimezone(day_start.tzinfo):%H:%M}" for a, b in gaps[:4])
+        g = ", ".join(f"{a.astimezone(tz):%H:%M}–{b.astimezone(tz):%H:%M}" for a, b in gaps[:4])
         sc.add("CG-DAY-GAPS", Severity.WARNING, f"Time window: day not fully covered (< {ctx.cfg.cg_min_coverage:.0%})",
                detail=f"{dlabel}: {coverage:.0%}, gaps {g} · {url}")
     if overlaps:

@@ -260,7 +260,8 @@ def _instances(ctx: Context, f: Findings, de: bool) -> None:
 # RelatedMaterial placement – mirrors the DVB-I reference validator (dvb-i-tools),
 # which cites A177 tables 14 (ServiceList), 15 (Service), 16 (ServiceInstance) and
 # 20 (ContentGuideSource).
-APP_CONTENT_TYPES = {"application/vnd.dvb.ait+xml", "text/html", "application/xhtml+xml", "application/xml"}
+# A177 table 7. Other values may be signalled; their semantics are undefined and clients may ignore them.
+APP_CONTENT_TYPES = {"application/vnd.dvb.ait+xml", "text/html", "application/xhtml+xml"}
 LOCATION_REF = {"ServiceList": "A177 table 14", "Service": "A177 table 15",
                 "ServiceInstance": "A177 table 16", "ContentGuideSource": "A177 table 20"}
 
@@ -340,8 +341,8 @@ def _check_app_locator(rm, href, term, where, kw, f, ns) -> None:
     for mu in uris:
         url, ct = (mu.text or "").strip(), mu.get("contentType", "")
         if ct and ct not in APP_CONTENT_TYPES:
-            f.error("RM05", "Application MediaUri@contentType is not a permitted application type", ref="A177",
-                    detail=f"{where}: contentType '{ct}' · {url}", **kw)
+            f.info("RM05", "Application MediaUri@contentType is not defined by A177 – receivers may ignore the application",
+                   ref="A177 table 7", detail=f"{where}: contentType '{ct}' · {url}", **kw)
         if term == "3" and ct and ct != "application/vnd.dvb.ait+xml":
             f.error("RM05", "Service provider application (type 3) must use an XML AIT", ref="A177",
                     detail=f"{where}: contentType '{ct}' · {url}", **kw)

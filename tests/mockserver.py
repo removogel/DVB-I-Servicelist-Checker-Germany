@@ -84,6 +84,20 @@ AIT_OK = """<?xml version="1.0" encoding="UTF-8"?>
     <mhp:applicationTransport xsi:type="mhp:HTTPTransportType"><mhp:URLBase>{base}/app/</mhp:URLBase></mhp:applicationTransport>
     <mhp:applicationLocation>index.html</mhp:applicationLocation>
    </mhp:Application>
+   <mhp:Application>
+    <mhp:appName Language="eng">Event app (HTML5)</mhp:appName>
+    <mhp:applicationIdentifier><mhp:orgId>123</mhp:orgId><mhp:appId>2</mhp:appId></mhp:applicationIdentifier>
+    <mhp:applicationDescriptor>
+     <mhp:type><mhp:OtherApp>text/html</mhp:OtherApp></mhp:type>
+     <mhp:controlCode>AUTOSTART</mhp:controlCode>
+     <mhp:visibility>VISIBLE_ALL</mhp:visibility>
+     <mhp:priority>1</mhp:priority>
+     <mhp:version>01</mhp:version>
+     <mhp:mhpVersion><mhp:profile>0</mhp:profile><mhp:versionMajor>1</mhp:versionMajor><mhp:versionMinor>7</mhp:versionMinor><mhp:versionMicro>1</mhp:versionMicro></mhp:mhpVersion>
+    </mhp:applicationDescriptor>
+    <mhp:applicationTransport xsi:type="mhp:HTTPTransportType"><mhp:URLBase>{base}/app/</mhp:URLBase></mhp:applicationTransport>
+    <mhp:applicationLocation>index.html</mhp:applicationLocation>
+   </mhp:Application>
   </mhp:ApplicationList>
  </mhp:ApplicationDiscovery>
 </mhp:ServiceDiscovery>"""
@@ -92,7 +106,7 @@ AIT_BAD = """<?xml version="1.0" encoding="UTF-8"?>
 <mhp:ServiceDiscovery xmlns:mhp="urn:dvb:mhp:2009"><mhp:ApplicationDiscovery DomainName="example.org"><mhp:ApplicationList>
  <mhp:Application>
   <mhp:applicationIdentifier><mhp:orgId>abc</mhp:orgId><mhp:appId>1</mhp:appId></mhp:applicationIdentifier>
-  <mhp:applicationDescriptor><mhp:type><mhp:OtherApp>text/html</mhp:OtherApp></mhp:type><mhp:controlCode>PRESENT</mhp:controlCode></mhp:applicationDescriptor>
+  <mhp:applicationDescriptor><mhp:type><mhp:OtherApp>application/vnd.example.app</mhp:OtherApp></mhp:type><mhp:controlCode>PRESENT</mhp:controlCode></mhp:applicationDescriptor>
  </mhp:Application>
 </mhp:ApplicationList></mhp:ApplicationDiscovery></mhp:ServiceDiscovery>"""
 

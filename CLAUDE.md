@@ -129,6 +129,12 @@ wrong HowRelatedCS version, invalid application contentType).
 - **XML AIT** is checked structurally; an official XSD is optional (`--ait-xsd`).
   Application entry URLs using `http://` are common practice and are deliberately **not**
   flagged (the former code `AIT-APP-HTTPS` was removed). Only their reachability is checked.
+  Content-Type of the AIT file: only `application/vnd.dvb.ait+xml` (`AIT-CT`). Application types
+  in `mhp:OtherApp`: HbbTV, `text/html` or `application/xhtml+xml` (A177 5.2.4.1, `AIT-TYPE`); an AIT
+  may carry alternative instances, so AUTOSTART ambiguity is judged per type. A linked app 1.2
+  without an HbbTV instance is a warning (`AIT-NO-HBBTV`, DTVP IT-3: receivers need only HbbTV).
+- **Application `MediaUri@contentType`** values outside A177 table 7 may be signalled (semantics
+  undefined, clients may ignore them), so `RM05` reports them as INFO.
 - **RelatedMaterial placement** (`RM01`–`RM06`) mirrors the reference validator's rules per
   location (A177 tables 14/15/16/20). Rules that depend on where something is signalled
   (`DE-BB`, `DE-POPUP-OOS`, list logo in `images`) only consider permitted locations.

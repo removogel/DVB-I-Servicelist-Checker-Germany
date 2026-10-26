@@ -119,7 +119,9 @@ class TestFullRun(unittest.TestCase):
         self.assertIn(("RM01", "ServiceList"), rm)          # linked app at list level
         self.assertIn(("RM03", "Event Channel"), rm)        # out-of-service banner in instance
         self.assertIn(("RM04", "cg1"), rm)                  # service logo in content guide source
-        self.assertIn(("RM05", "Radio Three"), rm)          # invalid application contentType
+        self.assertIn(("RM05", "Radio Three"), rm)          # application contentType not defined by A177
+        rm05 = [f for f in by_code(self.rr, "a177", "RM05") if f.subject == "Radio Three"]
+        self.assertEqual({f.severity.name for f in rm05}, {"INFO"})   # may be signalled, clients may ignore it
         self.assertIn(("RM06", "ARD SR"), rm)               # HowRelatedCS:2019 in an r6 list
         self.assertFalse({s for c, s in rm if s in ("One", "Two")},
                          "correctly placed logos and linked apps must not be flagged")
@@ -202,8 +204,11 @@ class TestAitMpd(TestFullRun):
         ok = [f.code for f in ait.findings if f.subject == "Event Channel" and f.severity.name == "ERROR"]
         self.assertEqual(ok, [], "a valid AIT must not have errors")
         bad = {f.code for f in ait.findings if f.subject == "End of List"}
-        for c in ("AIT-CT", "AIT-ID", "AIT-TYPE", "AIT-TRANSPORT", "AIT-LOC", "AIT-AUTOSTART"):
+        for c in ("AIT-CT", "AIT-ID", "AIT-TYPE", "AIT-TRANSPORT", "AIT-LOC", "AIT-AUTOSTART", "AIT-NO-HBBTV"):
             self.assertIn(c, bad)
+        # HbbTV plus an alternative HTML5 instance, both AUTOSTART: permitted by A177 5.2.4.1
+        good = {f.code for f in ait.findings if f.subject == "Event Channel"}
+        self.assertFalse(good & {"AIT-TYPE", "AIT-AUTOSTART", "AIT-NO-HBBTV"}, good)
         entry = ait.stats["aits"][0]["apps"] + ait.stats["aits"][1]["apps"]
         self.assertTrue(any(a.get("entry_status") == 200 for a in entry))
 

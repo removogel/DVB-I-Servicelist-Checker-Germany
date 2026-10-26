@@ -1,7 +1,7 @@
 """Checks of the XML AITs of linked applications (HbbTV).
 
 Basis: ETSI TS 102 809 (XML AIT, namespace urn:dvb:mhp:2009),
-ETSI TS 102 796 / HbbTV 2.0.4 (application type application/vnd.hbbtv.xhtml+xml),
+ETSI TS 102 796 / HbbTV 2.0.4, A177 5.2.4.1 (Content-Type and application types),
 A177r6 linked applications (LinkedApplicationCS:2019) and DTVP IT-3/IT-6.
 
 Without an official XSD, structure and mandatory fields are checked directly. If
@@ -11,7 +11,7 @@ validated against the schema.
 from __future__ import annotations
 
 import re
-from collections import defaultdict
+from collections import Counter, defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from urllib.parse import urljoin
@@ -26,6 +26,8 @@ from . import Context
 MHP_NS = "urn:dvb:mhp:2009"
 AIT_CT = "application/vnd.dvb.ait+xml"
 HBBTV_APP = "application/vnd.hbbtv.xhtml+xml"
+# A177 5.2.4.1: application types permitted in mhp:OtherApp (HbbTV, or an HTML5 web page)
+APP_TYPES = {HBBTV_APP, "text/html", "application/xhtml+xml"}
 CONTROL_CODES = {"AUTOSTART", "PRESENT", "DESTROY", "KILL", "PREFETCH", "REMOTE", "DISABLED", "PLAYBACK_AUTOSTART"}
 REF_AIT = "ETSI TS 102 809 (XML AIT)"
 REF_HBB = "HbbTV / ETSI TS 102 796"
@@ -114,7 +116,7 @@ def check_ait(ctx: Context, url: str, declared_ct: str, kinds: set) -> AitReport
     if not apps:
         rep.add("AIT-NOAPP", Severity.ERROR, "AIT contains no Application", ref=REF_AIT)
         return rep
-    autostart = 0
+    autostart: Counter = Counter()  # per application type – alternatives may each autostart
     for i, app in enumerate(apps, 1):
         info = {"name": _t(app, "appName")}
         tag = f"Application {i}" + (f" '{info['name']}'" if info["name"] else "")
@@ -130,15 +132,17 @@ def check_ait(ctx: Context, url: str, declared_ct: str, kinds: set) -> AitReport
             continue
         app_type = _t(_k(desc, "type"), "OtherApp")
         info["type"] = app_type
-        if app_type != HBBTV_APP:
-            rep.add("AIT-TYPE", Severity.ERROR, f"Application type is not {HBBTV_APP}", ref="DTVP IT-3 / " + REF_HBB,
-                    detail=f"{tag}: {app_type}")
+        # An AIT may carry alternative instances of the same application (e.g. HbbTV and HTML5).
+        if app_type not in APP_TYPES:
+            rep.add("AIT-TYPE", Severity.ERROR,
+                    "Application type is not one of application/vnd.hbbtv.xhtml+xml, text/html, application/xhtml+xml",
+                    ref="A177 5.2.4.1", detail=f"{tag}: {app_type}")
         cc = _t(desc, "controlCode")
         info["controlCode"] = cc
         if cc not in CONTROL_CODES:
             rep.add("AIT-CC", Severity.ERROR, "controlCode missing or invalid", ref=REF_AIT, detail=f"{tag}: {cc}")
         if cc == "AUTOSTART":
-            autostart += 1
+            autostart[app_type] += 1
         for el in ("visibility", "priority", "version"):
             if _t(desc, el) is None:
                 rep.add("AIT-DESC-FIELD", Severity.WARNING, f"applicationDescriptor without {el}", ref=REF_AIT, detail=tag)
@@ -176,13 +180,18 @@ def check_ait(ctx: Context, url: str, declared_ct: str, kinds: set) -> AitReport
                             ref=REF_HBB, detail=f"{tag}: {ra.content_type} · {entry}")
         rep.apps.append(info)
     if "1.2" in rep.kinds or "1.1" in rep.kinds:
-        if autostart == 0:
+        if not autostart:
             rep.add("AIT-AUTOSTART", Severity.WARNING,
                     "No Application with controlCode AUTOSTART – linked application does not start automatically on channel change",
                     ref="A177 (Linked Application) / " + REF_HBB)
-        elif autostart > 1:
-            rep.add("AIT-AUTOSTART", Severity.WARNING, f"{autostart} Applications with AUTOSTART (ambiguous)",
-                    ref=REF_HBB)
+        for app_type, n in autostart.items():
+            if n > 1:
+                rep.add("AIT-AUTOSTART", Severity.WARNING, "Several Applications of the same type with AUTOSTART (ambiguous)",
+                        ref=REF_HBB, detail=f"{n}× {app_type}")
+    if "1.2" in rep.kinds and not any(a.get("type") == HBBTV_APP for a in rep.apps):
+        rep.add("AIT-NO-HBBTV", Severity.WARNING,
+                "Linked application 1.2 without an HbbTV instance – receivers are only required to support HbbTV",
+                ref="DTVP IT-3", detail=", ".join(sorted({str(a.get("type")) for a in rep.apps})))
     return rep
 
 

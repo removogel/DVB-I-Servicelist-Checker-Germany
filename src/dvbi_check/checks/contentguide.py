@@ -2,7 +2,7 @@
 
 Requests per A177 clause 6 (as in the DVB-I reference validator):
   ScheduleInfoEndpoint?sid=<id>&now_next=true
-  ScheduleInfoEndpoint?sid=<id>&start=<epoch>&end=<epoch>
+  ScheduleInfoEndpoint?sid=<id>&start=<epoch>&end=<epoch>   (A177 6.5.2: 3-hour aligned, 6 or 12 hours)
   ProgramInfoEndpoint?pid=<crid>
 Content requirements: DTVP IT-6 (content guide metadata, tables 41–64).
 """
@@ -255,32 +255,86 @@ def _event_fields(sc: ServiceCG, e: Event, where: str) -> None:
         sc.counters[("CG-EV-INSTDESC", where)] += 1
 
 
-def check_schedule_day(ctx, sc, ep, sid, day_start: datetime, offset: int) -> tuple[list[str], list]:
-    tz = day_start.tzinfo
-    dlabel = f"{WEEKDAYS[day_start.weekday()]} {day_start:%Y-%m-%d}"
-    # Local midnight to local midnight, computed in UTC: days with a DST change last 23 or 25 hours.
-    day_end = datetime.combine(day_start.date() + timedelta(days=1), time(0), tz).astimezone(timezone.utc)
-    day_start = day_start.astimezone(timezone.utc)
-    url = add_query(ep, sid=sid, start=int(day_start.timestamp()), end=int(day_end.timestamp()))
+STEP = 10_800  # A177 6.5.2.1: start and end lie on 3-hour boundaries (UTC)
+
+
+@dataclass
+class Block:
+    """One schedule request (A177 6.5.2) and the events it returned."""
+    start: datetime
+    end: datetime
+    url: str
+    ok: bool = False
+    events: list[Event] = field(default_factory=list)
+
+
+def schedule_blocks(range_start: datetime, range_end: datetime, hours: int) -> list[tuple[datetime, datetime]]:
+    """Request windows per A177 6.5.2.1: aligned to 3 hours UTC, 6 or 12 hours long, covering the range."""
+    t = int(range_start.timestamp()) // STEP * STEP
+    end = int(range_end.timestamp())
+    out = []
+    while t < end:
+        out.append((datetime.fromtimestamp(t, timezone.utc), datetime.fromtimestamp(t + hours * 3600, timezone.utc)))
+        t += hours * 3600
+    return out
+
+
+def _local_label(dt: datetime, tz) -> str:
+    d = dt.astimezone(tz)
+    return f"{WEEKDAYS[d.weekday()]} {d:%Y-%m-%d %H:%M}"
+
+
+def fetch_block(ctx, sc, ep, sid, bs: datetime, be: datetime, tz) -> tuple[Block, list]:
+    url = add_query(ep, sid=sid, start=int(bs.timestamp()), end=int(be.timestamp()))
+    block = Block(bs, be, url)
     label = "Time window"
-    doc = fetch_tva(ctx, sc, url, label, dlabel)
-    days = sc.stats.setdefault("days", {})
+    doc = fetch_tva(ctx, sc, url, label, f"{_local_label(bs, tz)}–{be.astimezone(tz):%H:%M}")
     if doc is None:
-        days[offset] = None
-        return [], []
-    events = []
+        return block, []
+    block.ok = True
     for s in doc.schedules:
         for a in ("serviceIDRef", "start", "end"):
             if s.get(a) is None:
                 sc.counters[("CG-SCHED-ATTR", a)] += 1
         if s.get("serviceIDRef") not in (None, sid):
             sc.add("CG-SID", Severity.ERROR, f"{label}: Schedule@serviceIDRef does not match the requested sid",
-                   detail=f"{dlabel} · {s.get('serviceIDRef')} ≠ {sid}")
-        events += events_of(s)
-    for e in events:
-        _event_fields(sc, e, "Time window")
+                   detail=f"{_local_label(bs, tz)} · {s.get('serviceIDRef')} ≠ {sid}")
+        block.events += events_of(s)
+    images = []
+    for e in block.events:
+        _event_fields(sc, e, label)
+        pi = doc.programs.get(e.crid)
+        if pi is not None:
+            images += check_program_info(sc, pi, label)
+        elif e.crid:
+            sc.counters[("CG-PI-INLINE", label)] += 1
+    return block, images
+
+
+def merge_events(blocks: list[Block]) -> list[Event]:
+    """Combines the responses like a DVB-I client: events returned by several requests count once."""
+    merged: dict = {}
+    for b in blocks:
+        for e in b.events:
+            if e.start and e.end:
+                merged.setdefault((e.crid, e.start), e)
+    return sorted(merged.values(), key=lambda e: (e.start, e.end))
+
+
+def evaluate_day(ctx, sc, events: list[Event], blocks: list[Block], day_start: datetime, offset: int) -> None:
+    tz = day_start.tzinfo
+    dlabel = f"{WEEKDAYS[day_start.weekday()]} {day_start:%Y-%m-%d}"
+    # Local midnight to local midnight, computed in UTC: days with a DST change last 23 or 25 hours.
+    day_end = datetime.combine(day_start.date() + timedelta(days=1), time(0), tz).astimezone(timezone.utc)
+    day_start = day_start.astimezone(timezone.utc)
+    days = sc.stats.setdefault("days", {})
+    touching = [b for b in blocks if b.start < day_end and b.end > day_start]
+    if any(not b.ok for b in touching):
+        days[offset] = None  # already reported as CG-HTTP/CG-XML; coverage would be misleading
+        return
+    url = touching[0].url if touching else ""
     iv = sorted((max(e.start, day_start), min(e.end, day_end)) for e in events
-                if e.start and e.end and e.end > day_start and e.start < day_end)
+                if e.end > day_start and e.start < day_end)
     covered, gaps, overlaps, cursor = timedelta(), [], 0, day_start
     for a, b in iv:
         if a > cursor and (a - cursor) > timedelta(minutes=ctx.cfg.cg_max_gap_minutes):
@@ -295,7 +349,7 @@ def check_schedule_day(ctx, sc, ep, sid, day_start: datetime, offset: int) -> tu
     coverage = covered / (day_end - day_start)
     days[offset] = round(coverage, 3)
     must = offset >= 0  # today + 7 days "shall", past "should"
-    if not events:
+    if not iv:
         sc.add("CG-DAY-EMPTY", Severity.ERROR if must else Severity.WARNING,
                "Time window: no programme data for " + ("today or an upcoming day" if must else "a past day"),
                ref="DTVP IT-6 (today + 7 days 'shall', 7 days back 'should')", detail=f"{dlabel} · {url}")
@@ -305,14 +359,75 @@ def check_schedule_day(ctx, sc, ep, sid, day_start: datetime, offset: int) -> tu
                detail=f"{dlabel}: {coverage:.0%}, gaps {g} · {url}")
     if overlaps:
         sc.add("CG-DAY-OVERLAP", Severity.WARNING, "Time window: overlapping events", detail=f"{dlabel}: {overlaps}× · {url}")
-    images = []
-    for e in events:
-        pi = doc.programs.get(e.crid)
-        if pi is not None:
-            images += check_program_info(sc, pi, "Time window")
-        elif e.crid:
-            sc.counters[("CG-PI-INLINE", "Time window")] += 1
-    return [e.crid for e in events if e.crid][:3], images
+
+
+def check_window_boundaries(ctx, sc, events: list[Event], blocks: list[Block], tz) -> None:
+    """Detects servers that drop events running past the end of the requested period.
+
+    A177 6.5.2.1 selects events by PublishedStartTime only, so the last event of a response normally
+    ends after end_unixtime. If no response ever contains such an event and the boundaries between the
+    requests fall into gaps, the programme spanning each boundary is missing from both responses.
+    """
+    data = [b for b in blocks if b.ok and b.events]
+    if len(data) < 3:
+        return
+    crossing = sum(1 for b in data if any(e.end and e.end > b.end for e in b.events))
+    bounds = [b.end for b, nxt in zip(blocks, blocks[1:]) if b.ok and nxt.ok and b.events and nxt.events]
+    uncovered = [t for t in bounds if not any(e.start <= t < e.end for e in events)]
+    sc.stats["window_boundaries_uncovered"] = len(uncovered)
+    if len(uncovered) >= 2 and crossing <= len(data) // 10:
+        ex = ", ".join(_local_label(t, tz) for t in uncovered[:3])
+        sc.add("CG-WIN-BOUNDARY", Severity.WARNING,
+               "Time window: events running past the end of the requested period are not returned",
+               ref="A177 6.5.2.1",
+               detail=f"{len(uncovered)} of {len(bounds)} request boundaries fall into a gap, e.g. {ex} · {data[0].url}")
+
+
+def probe_inclusive(ctx, sc, ep, sid, blocks: list[Block], now: datetime) -> None:
+    """Optional inclusive=true (A177 6.5.2.2): recorded in the statistics only, never a finding."""
+    cur = next((b for b in blocks if b.start <= now < b.end), None)
+    if cur is None or not cur.ok:
+        return
+    url = add_query(ep, sid=sid, start=int(cur.start.timestamp()), end=int(cur.end.timestamp()), inclusive="true")
+    r = ctx.client.get(url)
+    sc.stats["requests"] = sc.stats.get("requests", 0) + 1
+    state = "request failed"
+    if r.ok:
+        try:
+            root = etree.fromstring(r.content, etree.XMLParser(no_network=True, resolve_entities=False, huge_tree=True))
+            pd = kid(root, "ProgramDescription")
+            starts = [e.start for s in kids(kid(pd, "ProgramLocationTable"), "Schedule") for e in events_of(s) if e.start]
+            if not starts:
+                state = "no events"
+            elif min(starts) < cur.start:
+                state = "supported"
+            elif min(starts) > cur.start:
+                state = "not supported"
+            else:
+                state = "undetermined"
+        except etree.XMLSyntaxError:
+            state = "invalid response"
+    sc.stats["inclusive"] = state
+
+
+def check_schedule(ctx, sc, ep, sid, now: datetime) -> tuple[list[str], list]:
+    tz = ZoneInfo(ctx.cfg.cg_timezone)
+    today = now.astimezone(tz).date()
+    hours = ctx.cfg.cg_window_hours if ctx.cfg.cg_window_hours in (6, 12) else 12
+    offsets = range(-ctx.cfg.cg_days_past, ctx.cfg.cg_days_future + 1)
+    first = datetime.combine(today + timedelta(days=offsets[0]), time(0), tz)
+    last = datetime.combine(today + timedelta(days=offsets[-1] + 1), time(0), tz)
+    blocks, images = [], []
+    for bs, be in schedule_blocks(first, last, hours):
+        b, im = fetch_block(ctx, sc, ep, sid, bs, be, tz)
+        blocks.append(b)
+        images += im
+    events = merge_events(blocks)
+    for off in offsets:
+        evaluate_day(ctx, sc, events, blocks, datetime.combine(today + timedelta(days=off), time(0), tz), off)
+    check_window_boundaries(ctx, sc, events, blocks, tz)
+    probe_inclusive(ctx, sc, ep, sid, blocks, now)
+    return [e.crid for b in blocks for e in b.events if e.crid][:3], images
 
 
 def check_program_endpoint(ctx, sc, ep, crid) -> list:
@@ -387,14 +502,9 @@ def check_service(ctx: Context, svc: Service) -> ServiceCG:
             sc.add("CG-HTTPS", Severity.WARNING, "Content guide endpoint without HTTPS", detail=u)
     now = datetime.now(timezone.utc)
     crids, images = check_now_next(ctx, sc, sched, sid, now)
-    tz = ZoneInfo(ctx.cfg.cg_timezone)
-    today = now.astimezone(tz).date()
-    for off in range(-ctx.cfg.cg_days_past, ctx.cfg.cg_days_future + 1):
-        start = datetime.combine(today + timedelta(days=off), time(0), tz)
-        c, im = check_schedule_day(ctx, sc, sched, sid, start, off)
-        if not crids:
-            crids = c
-        images += im
+    c, im = check_schedule(ctx, sc, sched, sid, now)
+    crids = crids or c
+    images += im
     if prog and crids:
         images += check_program_endpoint(ctx, sc, prog, crids[0])
     elif not prog:
@@ -449,7 +559,9 @@ def run(ctx: Context) -> ModuleResult:
                 "now_next_ok": nn_ok,
                 "full_future_coverage": full,
                 "requests": sum(s.get("requests", 0) for s in per_service),
-                "window": f"-{ctx.cfg.cg_days_past} … +{ctx.cfg.cg_days_future} days ({ctx.cfg.cg_timezone})",
+                "window": f"-{ctx.cfg.cg_days_past} … +{ctx.cfg.cg_days_future} days ({ctx.cfg.cg_timezone}), "
+                          f"requests of {ctx.cfg.cg_window_hours} h",
+                "inclusive_supported": sum(1 for s in per_service if s.get("inclusive") == "supported"),
                 "per_service": per_service,
             }
     res.findings = f

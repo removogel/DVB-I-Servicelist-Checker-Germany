@@ -32,6 +32,10 @@ def jpeg(w, h) -> bytes:
     return b.getvalue()
 
 
+PROGRAMME_MINUTES = 90
+GRID_ANCHOR = datetime(2026, 1, 1, 0, 20, tzinfo=timezone.utc)
+
+
 def iso(dt: datetime) -> str:
     return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -201,20 +205,41 @@ class Handler(BaseHTTPRequestHandler):
                     f'<ProgramLocationTable><Schedule serviceIDRef="{sid}" start="{iso(s_now)}" '
                     f'end="{iso(s_now + timedelta(hours=1))}">{evs}</Schedule></ProgramLocationTable>')
             return self.send(tva(body), "application/xml")
-        start = datetime.fromtimestamp(int(q["start"]), timezone.utc)
-        end = datetime.fromtimestamp(int(q["end"]), timezone.utc)
-        if sid.endswith("gap") and start < now - timedelta(days=1):
+        # A177 6.5.2.1: start/end on 3-hour boundaries, 6 or 12 hours apart – otherwise 400 Bad Request
+        try:
+            st, en = int(q["start"]), int(q["end"])
+        except (KeyError, ValueError):
+            return self.send(b"bad request", "text/plain", 400)
+        if st % 10800 or en % 10800 or en - st not in (21600, 43200):
+            return self.send(b"bad request", "text/plain", 400)
+        start = datetime.fromtimestamp(st, timezone.utc)
+        end = datetime.fromtimestamp(en, timezone.utc)
+        gap = sid.endswith("gap")
+        if gap and start < now - timedelta(days=1):
             body = f'<ProgramLocationTable><Schedule serviceIDRef="{sid}" start="{iso(start)}" end="{iso(end)}"/></ProgramLocationTable>'
             return self.send(tva(body), "application/xml")
-        pis, evs, t, i = [], [], start, 0
+        # Fixed grid of 90-minute programmes, so programmes span the request boundaries and midnight.
+        # Default (A177): every programme starting in [start, end); inclusive=true adds the one running at start.
+        # The "gap" service mimics a faulty server that only returns programmes ending before `end`.
+        length = timedelta(minutes=PROGRAMME_MINUTES)
+        k = (start - GRID_ANCHOR) // length
+        t = GRID_ANCHOR + k * length
+        if t < start and not (q.get("inclusive") == "true" and not gap):
+            t += length
+        starts = []
         while t < end:
+            if not (gap and t + length > end):
+                starts.append(t)
+            t += length
+        pis, evs = [], []
+        for t in starts:
             crid = f"crid://test.de/{int(t.timestamp())}"
-            pis.append(program_info(crid, self.base, with_image=not sid.endswith("gap")))
-            evs.append(event(crid, t, 60, instance_desc=not sid.endswith("gap")))
-            t += timedelta(hours=1)
-            i += 1
+            pis.append(program_info(crid, self.base, with_image=not gap))
+            evs.append(event(crid, t, PROGRAMME_MINUTES, instance_desc=not gap))
+        # Table 50: Schedule@start/@end = start of the earliest and end of the latest event
+        s_start, s_end = (starts[0], starts[-1] + length) if starts else (start, start)
         body = (f'<ProgramInformationTable xml:lang="en">{"".join(pis)}</ProgramInformationTable>'
-                f'<ProgramLocationTable><Schedule serviceIDRef="{sid}" start="{iso(start)}" end="{iso(end)}">'
+                f'<ProgramLocationTable><Schedule serviceIDRef="{sid}" start="{iso(s_start)}" end="{iso(s_end)}">'
                 f'{"".join(evs)}</Schedule></ProgramLocationTable>')
         return self.send(tva(body), "application/xml")
 

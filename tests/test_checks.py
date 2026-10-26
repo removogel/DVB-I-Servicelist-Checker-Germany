@@ -9,14 +9,15 @@ import os
 import sys
 import tempfile
 import unittest
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 from pathlib import Path
 
 HERE = Path(__file__).parent
 sys.path.insert(0, str(HERE.parent / "src"))
 sys.path.insert(0, str(HERE))
 
-from dvbi_check.checks.contentguide import parse_duration  # noqa: E402
+from dvbi_check.checks.contentguide import parse_duration, schedule_blocks  # noqa: E402
 from dvbi_check.config import Config  # noqa: E402
 from dvbi_check.httpclient import add_query  # noqa: E402
 from dvbi_check.report import write_reports  # noqa: E402
@@ -52,6 +53,21 @@ class TestHelpers(unittest.TestCase):
         self.assertEqual(parse_duration("P1DT2S"), timedelta(days=1, seconds=2))
         self.assertIsNone(parse_duration("PT"))
         self.assertIsNone(parse_duration("1h"))
+
+    def test_schedule_blocks(self):
+        tz = ZoneInfo("Europe/Berlin")
+        # range across the DST change of 2026-10-25 (25-hour day)
+        first = datetime(2026, 10, 24, tzinfo=tz)
+        last = datetime(2026, 10, 27, tzinfo=tz)
+        for hours in (6, 12):
+            blocks = schedule_blocks(first, last, hours)
+            for a, b in blocks:
+                self.assertEqual(int(a.timestamp()) % 10800, 0)           # A177 6.5.2.1: 3-hour boundaries
+                self.assertEqual((b - a).total_seconds(), hours * 3600)   # 6 or 12 hours
+            for (_, b), (a, _) in zip(blocks, blocks[1:]):
+                self.assertEqual(a, b)                                    # contiguous
+            self.assertLessEqual(blocks[0][0], first.astimezone(timezone.utc))
+            self.assertGreaterEqual(blocks[-1][1], last.astimezone(timezone.utc))
 
     def test_add_query(self):
         self.assertEqual(add_query("https://a.de/x/", sid="tag:a.de,2024:x", now_next="true"),
@@ -139,6 +155,23 @@ class TestFullRun(unittest.TestCase):
         radio = [f.code for f in cg.findings if f.service == "tag:example.org,2026:radio-gap"]
         self.assertIn("CG-PI-IMG", radio)
         self.assertIn("CG-EV-INSTDESC", radio)
+
+    def test_schedule_windows(self):
+        cg = self.rr.module("cg")
+        stats = {s["service"]: s for s in cg.stats["per_service"]}
+        one = stats["tag:example.org,2026:one"]
+        # the mock answers non-conforming windows with 400, so no CG-HTTP means A177-conformant requests
+        self.assertFalse([f for f in cg.findings if f.code == "CG-HTTP"])
+        # programmes spanning midnight and request boundaries are merged: no gaps, no boundary warning
+        self.assertFalse([f for f in cg.findings if f.service == one["service"]
+                          and f.code in ("CG-DAY-GAPS", "CG-WIN-BOUNDARY", "CG-DAY-OVERLAP")])
+        self.assertEqual(one["window_boundaries_uncovered"], 0)
+        self.assertEqual(one["inclusive"], "supported")
+        # faulty server dropping programmes that run past the end of the request
+        radio = by_code(self.rr, "cg", "CG-WIN-BOUNDARY")
+        self.assertEqual([f.service for f in radio], ["tag:example.org,2026:radio-gap"])
+        self.assertEqual(stats["tag:example.org,2026:radio-gap"]["inclusive"], "not supported")
+        self.assertEqual(cg.stats["inclusive_supported"], 1)
         self.assertIn("CG-NOSOURCE", codes(self.rr, "cg"))
 
     def test_images(self):

@@ -9,7 +9,7 @@ It produces a report as HTML, JSON and CSV.
 | `schema` | XSD validation against the A177 standard schema and – for A177r6 – the German profile schema; Content-Type of the delivery |
 | `a177` | Semantics according to the standard: unique IDs, tag: URIs, classification scheme values, placement of `RelatedMaterial` (logos, banners, linked applications) per A177 tables 14/15/16/20 and their application locators, regions and postcode overlaps, LCN references, delivery parameters, logos, content guide references |
 | `profile` | Completeness according to the Book and DTVP: "M" fields from IT-6, DVB-S direct tuning (IT-13), broadband instance (Book 7.3), DRM via linked application (Book 11.3), content guide proxy (Book 12), LCN plan according to Book 6.6 (blocks, LCN 7/41–49, 50/51, radio block, end channel 3999), pop-up channels (Book 6.9), region depth (Book 10.2); for URL sources also invalid postcode handling (IT-5) and conditional GET (IT-18) |
-| `cg` | Content guide endpoints (TV-Anytime): now/next, a time window for every day from −7 to +7, programme info; TVA XSD; mandatory fields according to DTVP IT-6 (tables 41–64); daily coverage, gaps, overlaps; sample of EPG images |
+| `cg` | Content guide endpoints (TV-Anytime): now/next, schedule requests per A177 6.5.2 (3-hour aligned, 6 or 12 hours) covering −7 to +7 days, merged per service; programmes dropped at request boundaries; support of `inclusive=true`; programme info; TVA XSD; mandatory fields according to DTVP IT-6 (tables 41–64); daily coverage, gaps, overlaps; sample of EPG images |
 | `ait` | XML AITs of linked applications: reachability, Content-Type `application/vnd.dvb.ait+xml`, structure according to ETSI TS 102 809 (namespace, orgId/appId, application type `application/vnd.hbbtv.xhtml+xml`, controlCode, mhpVersion, HTTP transport, applicationLocation), AUTOSTART for linked apps, reachability of the entry page; optional XSD validation with `--ait-xsd` |
 | `mpd` | DASH manifests: reachability, response time, Content-Type, MPD structure, DVB-DASH profile (DTVP IT-3), `type="dynamic"` with `availabilityStartTime` and UTCTiming, codecs, DRM, minimum quality for TV according to Book 7.3 (960×540, > 2.5 Mbit/s); HLS playlists for reachability |
 | `refval` | *Optional, opt-in.* Runs the [DVB-I reference validator](https://github.com/paulhiggs/dvb-i-tools) via its REST interface (`--refval-url`) and merges its findings (codes `RV-…`) into the report, mapped back to services |
@@ -101,8 +101,17 @@ schema are then reported as warnings, because strictly validating clients might 
 - Content guide requests as in the DVB-I reference validator:
   `?sid=…&now_next=true`, `?sid=…&start=<epoch>&end=<epoch>`, `?pid=<crid>`.
   `sid` is `ContentGuideServiceRef`, otherwise `UniqueIdentifier`.
-- Day windows are formed in `cg_timezone` (default Europe/Berlin). Past days without data are a
-  warning ("should"), today and upcoming days an error ("shall").
+- Schedule requests follow A177 6.5.2.1: `start` and `end` lie on 3-hour boundaries (UTC) and are
+  6 or 12 hours apart (`cg_window_hours`, default 12); other requests may be rejected with 400.
+  As specified, a response contains the programmes *starting* in the requested period, so a
+  programme running over midnight belongs to the period in which it starts. The responses are
+  therefore merged per service (duplicates removed) before coverage is evaluated per day in
+  `cg_timezone` (default Europe/Berlin). Past days without data are a warning ("should"), today and
+  upcoming days an error ("shall").
+- `CG-WIN-BOUNDARY` is reported when a server never returns a programme that runs past the end of
+  the requested period and the request boundaries fall into gaps – the programme spanning each
+  boundary is then missing from both responses. Support of the optional `inclusive=true` is only
+  recorded in the statistics.
 - Logo variants are requested via `?image_variant=<value>` (A177 5.2.8.2.1). If your image
   server uses a different parameter name, it can be changed via `image_variant_param`.
 - The LCN plan is checked against the nationwide reference table (TargetRegion = top-level

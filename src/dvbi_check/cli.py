@@ -41,6 +41,8 @@ def build_parser() -> argparse.ArgumentParser:
                    help="only check the first N services in the content guide")
     r.add_argument("--cg-days-past", dest="cg_days_past", type=int)
     r.add_argument("--cg-days-future", dest="cg_days_future", type=int)
+    r.add_argument("--cg-window-hours", dest="cg_window_hours", type=int, choices=[6, 12],
+                   help="length of each schedule request (A177 6.5.2.1: 6 or 12 hours, default 12)")
     r.add_argument("--cg-proxy-host", dest="cg_proxy_hosts", action="append",
                    help="permitted content guide proxy host (can be repeated)")
     r.add_argument("--resources-dir", help="local dvb-i-tools directory (schemas/, res/)")
@@ -82,7 +84,7 @@ def cmd_run(args) -> int:
     logging.basicConfig(level=logging.INFO if args.verbose else logging.WARNING, format="%(levelname)s %(message)s")
     cfg = Config.load(args.config)
     cfg.update(**{k: getattr(args, k) for k in ("postcode", "user_agent", "timeout", "workers", "profile",
-                                                 "cg_max_services", "cg_days_past", "cg_days_future",
+                                                 "cg_max_services", "cg_days_past", "cg_days_future", "cg_window_hours",
                                                  "cg_proxy_hosts", "ait_xsd", "refval_url")})
     try:
         cfg.user_agent.encode("ascii")

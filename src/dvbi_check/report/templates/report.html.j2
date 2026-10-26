@@ -126,7 +126,7 @@ tr.clickable{cursor:pointer}
     {% if m.name == "schema" and m.stats.verdict %}{{ m.stats.verdict }}{% if m.stats.errors_standard %} · {{ m.stats.errors_standard }} deviation(s) from the standard schema{% endif %}
     {% elif m.name == "a177" and m.stats.services %}{{ m.stats.instances }} instances · {{ m.stats.lcn_tables }} LCN tables · {{ m.stats.regions }} regions
     {% elif m.name == "profile" and m.stats.lcn_distinct %}{{ m.stats.lcn_distinct }} LCNs · reference: {{ m.stats.reference_table }}
-    {% elif m.name == "cg" and m.stats.services_checked %}Now/Next ok: {{ m.stats.now_next_ok }}/{{ m.stats.services_checked }} · full preview: {{ m.stats.full_future_coverage }}/{{ m.stats.services_checked }}
+    {% elif m.name == "cg" and m.stats.services_checked %}Now/Next ok: {{ m.stats.now_next_ok }}/{{ m.stats.services_checked }} · full preview: {{ m.stats.full_future_coverage }}/{{ m.stats.services_checked }} · inclusive=true: {{ m.stats.inclusive_supported|default(0) }}/{{ m.stats.services_checked }}
     {% elif m.name == "ait" and m.stats.aits_checked %}{{ m.stats.aits_reachable }}/{{ m.stats.aits_checked }} reachable · {{ m.stats.aits_without_errors }} without errors
     {% elif m.name == "mpd" and m.stats.mpds_checked %}{{ m.stats.mpds_reachable }}/{{ m.stats.mpds_checked }} MPDs reachable · {{ m.stats.mpds_without_errors }} without errors{% if m.stats.hls_checked %} · {{ m.stats.hls_checked }} HLS{% endif %}
     {% elif m.name == "refval" and m.stats.http_status %}HTTP {{ m.stats.http_status }} · {{ m.stats.errors }} errors · {{ m.stats.warnings }} warnings{% if m.stats.downgraded %} · {{ m.stats.downgraded }} relaxed by DE profile{% endif %}

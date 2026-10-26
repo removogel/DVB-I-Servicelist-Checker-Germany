@@ -25,7 +25,10 @@ invalid_postcode = "00000"
 # cg_max_services = 20         # for quick runs only the first N services
 cg_days_past = 7               # DTVP IT-6: 7 days back "should"
 cg_days_future = 7             # DTVP IT-6: today + 7 days "shall"
-cg_timezone = "Europe/Berlin"
+cg_timezone = "Europe/Berlin"   # days are evaluated in this time zone
+# Schedule requests follow A177 6.5.2.1: start/end on 3-hour UTC boundaries, 6 or 12 hours long.
+# The responses are merged per service before coverage is evaluated per day.
+cg_window_hours = 12
 cg_min_coverage = 0.9
 cg_max_gap_minutes = 5
 cg_slow_seconds = 2.0

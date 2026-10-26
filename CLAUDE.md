@@ -110,7 +110,7 @@ Error cases deliberately covered by the fixture: regional programme on LCN 7 and
 block 41–49 (`DE-LCN-ARD7`), wrong regional programme on LCN 7 (`DE-LCN-7MAP`), service in the
 radio block without `linear-radio`, pop-up without out-of-service banner, DVB-S without tuning
 parameters, empty content guide, logo with wrong width and ignored variants, faulty AIT,
-static MPD with insufficient quality, unreachable MPD, reference validator findings (mocked), misplaced `RelatedMaterial` (linked app
+server dropping programmes that span a request boundary (`CG-WIN-BOUNDARY`), static MPD with insufficient quality, unreachable MPD, reference validator findings (mocked), misplaced `RelatedMaterial` (linked app
 at list level, out-of-service banner in an instance, service logo in a content guide source,
 wrong HowRelatedCS version, invalid application contentType).
 
@@ -119,7 +119,10 @@ wrong HowRelatedCS version, invalid application contentType).
 - **image_variant**: the parameter name `image_variant` (A177 5.2.8.2.1) is configurable
   because image servers may differ.
 - **Content guide requests** follow the DVB-I reference validator
-  (`?sid=…&now_next=true`, `?sid=…&start=…&end=…`, `?pid=…`).
+  (`?sid=…&now_next=true`, `?sid=…&start=…&end=…`, `?pid=…`). Schedule requests obey A177 6.5.2.1
+  (3-hour UTC boundaries, 6 or 12 hours, `schedule_blocks()`); responses are merged per service
+  (`merge_events()`) before per-day evaluation, because A177 selects events by start time only.
+  The mock answers non-conforming windows with 400.
 - **LCN rules from Book 6.6** recognise ARD/RTL/SAT.1 via regular expressions
   (`pattern_ard`, `pattern_rtl`, `pattern_sat1`); the reference table is the LCNTable whose
   TargetRegion is the top-level region.

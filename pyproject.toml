@@ -7,12 +7,13 @@ name = "dvbi-check"
 version = "0.1.0"
 description = "Validation tool for DVB-I service lists (A177r6) according to DVB-I Book Germany and the DTVP implementation profile"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 dependencies = [
     "lxml>=5.0",
     "requests>=2.31",
     "Pillow>=10.0",
     "Jinja2>=3.1",
+    "tomli>=2.0; python_version < '3.11'",
 ]
 
 [project.optional-dependencies]

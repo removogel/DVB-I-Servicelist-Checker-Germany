@@ -28,6 +28,10 @@ python -m unittest discover -s tests             # or: python -m pytest
 dvbi-check run tests/fixtures/mini_sl.xml --offline   # quick smoke test without network
 ```
 
+**Python ≥ 3.10.** Do not use APIs that only exist from 3.11 on: `tomllib` falls back to `tomli`
+(`config.py`), and `datetime.fromisoformat()` before 3.11 rejects `Z` and 3-digit fractions, so
+TVA times go through `contentguide.parse_time()`.
+
 Without access to GitHub: `DVBI_CHECK_RESOURCES=/path/to/dvb-i-tools` for tests or
 `--resources-dir` for the CLI (local clone of paulhiggs/dvb-i-tools).
 

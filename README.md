@@ -27,7 +27,7 @@ findings in the same report.
 
 ## Installation
 
-Requirement: Python 3.11 or newer.
+Requirement: Python 3.10 or newer (on 3.10 the `tomli` package is installed automatically).
 
 ```bash
 git clone https://github.com/removogel/DVB-I-Servicelist-Checker-Germany.git

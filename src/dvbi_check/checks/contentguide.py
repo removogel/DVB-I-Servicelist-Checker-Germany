@@ -42,11 +42,23 @@ def parse_duration(s: str | None) -> timedelta | None:
     return timedelta(days=int(d or 0), hours=int(h or 0), minutes=int(mi or 0), seconds=float(se or 0))
 
 
+FRACTION_RE = re.compile(r"\.(\d+)")
+
+
 def parse_time(s: str | None) -> datetime | None:
+    """ISO 8601 date-time as used by TV-Anytime, e.g. 2013-09-25T12:30:00.000Z.
+
+    Normalised first, because datetime.fromisoformat() before Python 3.11 accepts neither the
+    "Z" designator nor fractions other than 3 or 6 digits.
+    """
     if not s:
         return None
+    s = s.strip()
+    if s[-1:] in ("Z", "z"):
+        s = s[:-1] + "+00:00"
+    s = FRACTION_RE.sub(lambda m: "." + (m.group(1) + "000000")[:6], s, count=1)
     try:
-        dt = datetime.fromisoformat(s.strip())
+        dt = datetime.fromisoformat(s)
     except ValueError:
         return None
     return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)

@@ -1,7 +1,12 @@
 """Configuration: defaults < TOML file < command line."""
 from __future__ import annotations
 
-import tomllib
+import sys
+
+if sys.version_info >= (3, 11):
+    import tomllib
+else:  # Python 3.10: same API from the tomli package
+    import tomli as tomllib
 from dataclasses import dataclass, field, fields
 from pathlib import Path
 

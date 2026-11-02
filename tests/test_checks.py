@@ -17,7 +17,7 @@ HERE = Path(__file__).parent
 sys.path.insert(0, str(HERE.parent / "src"))
 sys.path.insert(0, str(HERE))
 
-from dvbi_check.checks.contentguide import parse_duration, schedule_blocks  # noqa: E402
+from dvbi_check.checks.contentguide import parse_duration, parse_time, schedule_blocks  # noqa: E402
 from dvbi_check.config import Config  # noqa: E402
 from dvbi_check.httpclient import add_query  # noqa: E402
 from dvbi_check.report import write_reports  # noqa: E402
@@ -53,6 +53,17 @@ class TestHelpers(unittest.TestCase):
         self.assertEqual(parse_duration("P1DT2S"), timedelta(days=1, seconds=2))
         self.assertIsNone(parse_duration("PT"))
         self.assertIsNone(parse_duration("1h"))
+
+    def test_parse_time(self):
+        utc = timezone.utc
+        # forms used by TV-Anytime/A177; "Z" and 3-digit fractions need normalising before Python 3.11
+        self.assertEqual(parse_time("2026-10-28T16:15:00Z"), datetime(2026, 10, 28, 16, 15, tzinfo=utc))
+        self.assertEqual(parse_time("2013-09-25T12:30:00.000Z"), datetime(2013, 9, 25, 12, 30, tzinfo=utc))
+        self.assertEqual(parse_time(" 2026-10-28T17:15:00.5+01:00 "),
+                         datetime(2026, 10, 28, 16, 15, 0, 500000, tzinfo=utc))
+        self.assertEqual(parse_time("2026-10-28T16:15:00"), datetime(2026, 10, 28, 16, 15, tzinfo=utc))
+        self.assertIsNone(parse_time("28.10.2026 16:15"))
+        self.assertIsNone(parse_time(""))
 
     def test_schedule_blocks(self):
         tz = ZoneInfo("Europe/Berlin")

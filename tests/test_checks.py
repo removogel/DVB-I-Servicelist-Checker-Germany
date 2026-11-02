@@ -120,8 +120,8 @@ class TestFullRun(unittest.TestCase):
         self.assertNotIn("DE-LCN-END", c)       # 3999 correctly assigned
         sat = by_code(self.rr, "profile", "DE-SAT")
         self.assertEqual([f.subject for f in sat], ["Two"])
-        dn = by_code(self.rr, "profile", "DE-M-DisplayName")
-        self.assertEqual([f.subject for f in dn], ["Two"])
+        # "Two" has a ServiceInstance without DisplayName – optional for broadcasters (DTVP decision)
+        self.assertNotIn("DE-M-DisplayName", c)
         m7 = by_code(self.rr, "profile", "DE-LCN-7MAP")[0]
         self.assertIn("ARD SR", m7.detail)
 

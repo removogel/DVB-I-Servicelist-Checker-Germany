@@ -142,8 +142,10 @@ wrong HowRelatedCS version, invalid application contentType).
 - **RelatedMaterial placement** (`RM01`–`RM06`) mirrors the reference validator's rules per
   location (A177 tables 14/15/16/20). Rules that depend on where something is signalled
   (`DE-BB`, `DE-POPUP-OOS`, list logo in `images`) only consider permitted locations.
-- **Removed rules**: `AIT-APP-HTTPS` (see above) and `LC03` (service listed more than once in
-  the same LCNTable – permitted by A177; the Book 6.6 rule remains as `DE-LCN-DUP`).
+- **Removed rules**: `AIT-APP-HTTPS` (see above), `LC03` (service listed more than once in
+  the same LCNTable – permitted by A177; the Book 6.6 rule remains as `DE-LCN-DUP`) and
+  `DE-M-DisplayName` (ServiceInstance without DisplayName – made optional for broadcasters by a
+  DTVP decision of 2026-11 that is not yet part of the published V1.0.1).
 - **Scope**: this is not a full port of the reference validator; see README "Scope".
 - **Reference validator (`refval`)** is opt-in (`refval_url`), because it sends the whole list
   to a third-party server. The DE variant is requested via the header `X-variants: DE` (POST;

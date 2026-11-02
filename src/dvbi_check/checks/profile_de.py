@@ -90,9 +90,8 @@ def _mandatory_service_fields(ctx: Context, f: Findings) -> None:
         if not doc.logo_uris(s):
             f.error("DE-M-Logo", "Service logo missing", ref=ref, **kw)
         for i in s.el.findall("d:ServiceInstance", ns):
-            if i.find("d:DisplayName", ns) is None:
-                f.error("DE-M-DisplayName", "ServiceInstance without DisplayName", ref=ref,
-                        detail=f"priority {i.get('priority')}", **kw)
+            # ServiceInstance/DisplayName: no longer checked – the DTVP made it optional for
+            # broadcasters (decision of 2026-11, after V1.0.1). The former code was DE-M-DisplayName.
             if not i.get("priority"):
                 f.error("DE-M-priority", "ServiceInstance without @priority", ref=ref, **kw)
     if not doc.xr("//d:LCNRange"):

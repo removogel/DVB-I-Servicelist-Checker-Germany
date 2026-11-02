@@ -80,9 +80,9 @@ def _mandatory_service_fields(ctx: Context, f: Findings) -> None:
             f.error("DE-M-ProviderName", "ProviderName missing", ref=ref, **kw)
         if s.service_type is None:
             f.error("DE-M-ServiceType", "ServiceType missing", ref=ref, **kw)
-        if s.el.find("d:ContentGuideSourceRef", ns) is None and s.el.find("d:ContentGuideSource", ns) is None:
-            f.error("DE-M-CGSourceRef", "ContentGuideSourceRef missing", ref=ref, **kw)
-        if s.el.find("d:ContentGuideServiceRef", ns) is None:
+        # ContentGuideSourceRef: no longer checked – the DTVP made it optional (decision of 2026-11,
+        # after V1.0.1). The former code was DE-M-CGSourceRef; a missing source is CG-NOSOURCE.
+        if doc.cg_source_for(s) is not None and s.el.find("d:ContentGuideServiceRef", ns) is None:
             f.error("DE-M-CGServiceRef", "ContentGuideServiceRef missing (client falls back to the UniqueIdentifier)",
                     ref=ref, **kw)
         if not s.el.get("version"):

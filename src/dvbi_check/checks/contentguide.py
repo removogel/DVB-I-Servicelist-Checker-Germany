@@ -498,8 +498,9 @@ def check_service(ctx: Context, svc: Service) -> ServiceCG:
     doc = ctx.doc
     cgs = doc.cg_source_for(svc)
     if cgs is None:
-        sc.add("CG-NOSOURCE", Severity.ERROR, "No content guide source – no EPG and no now/next",
-               ref="DTVP IT-6 (ContentGuideSourceRef 'M')")
+        # ContentGuideSourceRef is optional (DTVP decision 2026-11), but receivers then show no EPG.
+        sc.add("CG-NOSOURCE", Severity.WARNING, "No content guide source – no EPG and no now/next",
+               ref="DTVP IT-6")
         sc.stats["now_next"] = "no source"
         return sc
     sid = doc.cg_service_id(svc)

@@ -185,7 +185,14 @@ class TestFullRun(unittest.TestCase):
         self.assertEqual([f.service for f in radio], ["tag:example.org,2026:radio-gap"])
         self.assertEqual(stats["tag:example.org,2026:radio-gap"]["inclusive"], "not supported")
         self.assertEqual(cg.stats["inclusive_supported"], 1)
-        self.assertIn("CG-NOSOURCE", codes(self.rr, "cg"))
+        nosrc = by_code(self.rr, "cg", "CG-NOSOURCE")
+        self.assertTrue(nosrc)
+        self.assertEqual({f.severity.name for f in nosrc}, {"WARNING"})   # source optional (DTVP decision)
+        prof = codes(self.rr, "profile")
+        self.assertNotIn("DE-M-CGSourceRef", prof)
+        # services without any content guide source get no ContentGuideServiceRef finding
+        nosrc_svc = {f.service for f in nosrc}
+        self.assertFalse([f for f in by_code(self.rr, "profile", "DE-M-CGServiceRef") if f.service in nosrc_svc])
 
     def test_images(self):
         img = self.rr.module("images")

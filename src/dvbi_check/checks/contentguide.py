@@ -114,7 +114,7 @@ class ServiceCG:
 # ------------------------------------------------------------------ response handling
 def fetch_tva(ctx: Context, sc: ServiceCG, url: str, label: str, where: str = "") -> TvaDoc | None:
     pre = f"{where} · " if where else ""
-    r: HttpResult = ctx.client.get(url)
+    r: HttpResult = ctx.client.get(url, use_cache=False)  # never reused; keeps memory flat
     sc.stats.setdefault("requests", 0)
     sc.stats["requests"] += 1
     sc.stats.setdefault("response_times", []).append(round(r.elapsed, 3))
@@ -401,7 +401,7 @@ def probe_inclusive(ctx, sc, ep, sid, blocks: list[Block], now: datetime) -> Non
     if cur is None or not cur.ok:
         return
     url = add_query(ep, sid=sid, start=int(cur.start.timestamp()), end=int(cur.end.timestamp()), inclusive="true")
-    r = ctx.client.get(url)
+    r = ctx.client.get(url, use_cache=False)
     sc.stats["requests"] = sc.stats.get("requests", 0) + 1
     state = "request failed"
     if r.ok:

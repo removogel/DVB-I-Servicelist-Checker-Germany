@@ -42,7 +42,8 @@ cli.py            argparse; maps CLI options onto Config
 runner.py         loads list → ServiceListDoc → runs modules in checks.ORDER → RunResult
 config.py         dataclass Config; defaults < TOML (--config) < CLI
 loader.py         file or URL (+ ?postcode=), HTTP metadata
-httpclient.py     requests session per thread, cache, retries, timing, add_query()
+httpclient.py     requests session per thread, bounded LRU cache (content guide requests bypass
+                  it: never reused), retries, timing, add_query()
 sl.py             ServiceListDoc: revision-independent access (namespaces, services,
                   regions, LCN tables, CG sources, logos, linked apps, service_of())
 resources.py      pinned dvb-i-tools (PINNED_REF), schema mapping per namespace year

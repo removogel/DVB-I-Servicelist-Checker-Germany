@@ -19,7 +19,7 @@ sys.path.insert(0, str(HERE))
 
 from dvbi_check.checks.contentguide import parse_duration, parse_time, schedule_blocks  # noqa: E402
 from dvbi_check.config import Config  # noqa: E402
-from dvbi_check.httpclient import add_query  # noqa: E402
+from dvbi_check.httpclient import HttpClient, add_query  # noqa: E402
 from dvbi_check.report import write_reports  # noqa: E402
 from dvbi_check.resources import ResourceError, locate  # noqa: E402
 from dvbi_check.runner import run  # noqa: E402
@@ -84,6 +84,24 @@ class TestHelpers(unittest.TestCase):
         self.assertEqual(add_query("https://a.de/x/", sid="tag:a.de,2024:x", now_next="true"),
                          "https://a.de/x/?sid=tag:a.de,2024:x&now_next=true")
         self.assertEqual(add_query("https://a.de/l.png?v=1", w=160), "https://a.de/l.png?v=1&w=160")
+
+
+class TestHttpCache(unittest.TestCase):
+    def test_cache_is_bounded(self):
+        with MockServer() as m:
+            c = HttpClient(cache_bytes=3000, cache_item_bytes=2000)
+            urls = [f"{m.base}/logo/ok.png?n={i}" for i in range(20)]
+            for u in urls:
+                self.assertTrue(c.get(u).ok)
+            self.assertLessEqual(c._cache_size, 3000)                       # LRU keeps memory bounded
+            self.assertEqual(c._cache_size, sum(len(r.content) for r in c._cache.values()))
+            n = c.request_count
+            c.get(urls[-1])                                                  # most recent: from cache
+            self.assertEqual(c.request_count, n)
+            c.get(urls[0])                                                   # evicted: fetched again
+            self.assertEqual(c.request_count, n + 1)
+            c.get(f"{m.base}/cg/schedule?sid=x&now_next=true", use_cache=False)
+            self.assertFalse([k for k in c._cache if "schedule" in k[0]])
 
 
 class TestFullRun(unittest.TestCase):

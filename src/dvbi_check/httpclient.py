@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import threading
 import time
+from collections import OrderedDict
 from dataclasses import dataclass, field
 from urllib.parse import urlsplit, urlunsplit, urlencode, parse_qsl
 
@@ -46,14 +47,21 @@ def add_query(url: str, **params) -> str:
 
 class HttpClient:
     def __init__(self, user_agent: str = DEFAULT_UA, timeout: float = 10.0, retries: int = 1,
-                 max_bytes: int = 30 * 1024 * 1024, verify: bool = True):
+                 max_bytes: int = 30 * 1024 * 1024, verify: bool = True,
+                 cache_bytes: int = 64 * 1024 * 1024, cache_item_bytes: int = 2 * 1024 * 1024):
         self.user_agent = user_agent
         self.timeout = timeout
         self.retries = retries
         self.max_bytes = max_bytes
         self.verify = verify
         self._local = threading.local()
-        self._cache: dict[tuple, HttpResult] = {}
+        # Bounded LRU cache: logos, AITs and images are requested by several services, but a full
+        # run produces thousands of responses that are never reused (content guide), so an
+        # unbounded cache can exhaust the memory of the machine.
+        self._cache: OrderedDict[tuple, HttpResult] = OrderedDict()
+        self._cache_size = 0
+        self.cache_bytes = cache_bytes
+        self.cache_item_bytes = cache_item_bytes
         self._lock = threading.Lock()
         self.request_count = 0
 
@@ -70,11 +78,17 @@ class HttpClient:
         if use_cache:
             with self._lock:
                 if key in self._cache:
+                    self._cache.move_to_end(key)
                     return self._cache[key]
         result = self._fetch(url, headers or {})
-        if use_cache:
+        if use_cache and len(result.content) <= self.cache_item_bytes:
             with self._lock:
-                self._cache[key] = result
+                if key not in self._cache:
+                    self._cache[key] = result
+                    self._cache_size += len(result.content)
+                while self._cache_size > self.cache_bytes and self._cache:
+                    _, old = self._cache.popitem(last=False)
+                    self._cache_size -= len(old.content)
         return result
 
     def _fetch(self, url: str, headers: dict[str, str]) -> HttpResult:

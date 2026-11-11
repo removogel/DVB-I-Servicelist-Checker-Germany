@@ -114,7 +114,10 @@ with `--fail-on never` never. This makes the tool usable in CI pipelines.
   permits (e.g. DVB-C triplets with serviceId only, according to IT-12).
 
 With the `de` profile the German profile schema is authoritative. Deviations from the standard
-schema are then reported as warnings, because strictly validating clients might reject the list.
+schema that the German profile schema permits (e.g. DVB-C instances without `NetworkID`,
+DTVP IT-12) are not listed individually; their number is given in the info `SC30`. Standard schema
+errors at places where the German schema fails as well are listed as warnings (`SC10`) next to
+the error (`SC20`).
 
 ## Conventions and assumptions
 

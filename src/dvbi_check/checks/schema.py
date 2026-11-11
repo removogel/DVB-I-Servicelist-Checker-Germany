@@ -16,12 +16,18 @@ def _short(msg: str) -> str:
     return NS_RE.sub("", msg).replace("Schemas validity error : ", "")
 
 
-def validate(ctx: Context, xsd_path, label: str, f: Findings, code: str, as_error: bool) -> tuple[bool, int]:
+def validate(ctx: Context, xsd_path, label: str, f: Findings | None, code: str, as_error: bool,
+             only_paths: set | None = None) -> tuple[bool, int, set]:
+    """Validates the list; reports each error (all, or only those at `only_paths`) and returns
+    (valid, number of errors, error paths)."""
     schema = load_schema(str(xsd_path))
     ok = schema.validate(ctx.doc.tree)
     if ok:
-        return True, 0
+        return True, 0, set()
+    paths = {e.path for e in schema.error_log}
     for e in schema.error_log:
+        if f is None or (only_paths is not None and e.path not in only_paths):
+            continue
         el = None
         try:
             found = ctx.doc.tree.xpath(e.path) if e.path else []
@@ -33,7 +39,7 @@ def validate(ctx: Context, xsd_path, label: str, f: Findings, code: str, as_erro
         add(code, _short(e.message), ref=label, service=svc.uid if svc else None,
             subject=svc.name if svc else (e.path or f"line {e.line}"),
             detail=f"path {e.path}, line {e.line}")
-    return False, len(schema.error_log)
+    return False, len(schema.error_log), paths
 
 
 def run(ctx: Context) -> ModuleResult:
@@ -52,22 +58,30 @@ def run(ctx: Context) -> ModuleResult:
                 f.error("SC01", f"No schema registered for namespace {doc.ns}", ref="A177")
             else:
                 use_de = ctx.cfg.profile == "de" and de is not None
-                # With the DE profile the German schema is authoritative; deviations from the standard are reported separately.
-                ok_std, n_std = validate(ctx, std, f"XSD {std.name}", f, "SC10", as_error=not use_de)
-                res.stats["valid_standard"] = ok_std
-                res.stats["errors_standard"] = n_std
+                de_paths: set = set()
                 if de is not None:
-                    ok_de, n_de = validate(ctx, de, f"XSD {de.name}", f, "SC20", as_error=use_de)
+                    ok_de, n_de, de_paths = validate(ctx, de, f"XSD {de.name}", f, "SC20", as_error=use_de)
                     res.stats["valid_de_profile"] = ok_de
                     res.stats["errors_de_profile"] = n_de
+                # With the DE profile the German schema is authoritative: deviations from the standard schema
+                # that the DE profile schema permits (e.g. DVB-C without NetworkID, DTVP IT-12) are not
+                # reported individually, only counted in SC30. Standard errors at places where the DE schema
+                # fails as well remain warnings next to the SC20 error.
+                ok_std, n_std, std_paths = validate(ctx, std, f"XSD {std.name}", f, "SC10", as_error=not use_de,
+                                                    only_paths=de_paths if use_de else None)
+                res.stats["valid_standard"] = ok_std
+                res.stats["errors_standard"] = n_std
                 if use_de:
                     verdict = ("valid (standard and DE profile)" if ok_std and res.stats["valid_de_profile"]
                                else "valid against DE profile schema only" if res.stats["valid_de_profile"]
                                else "not valid")
-                    if not ok_std and res.stats["valid_de_profile"]:
-                        f.info("SC30", f"{n_std} deviation(s) from the standard schema that the German "
-                                       "profile schema permits. Clients validating strictly against the "
-                                       "standard might reject the list.", ref="DTVP IT-12 / XSD (DE)")
+                    permitted = sum(1 for e in std_paths if e not in de_paths)
+                    res.stats["deviations_permitted_by_de"] = permitted
+                    if permitted:
+                        f.info("SC30", f"{permitted} place(s) deviate from the standard schema in a way the German "
+                                       "profile schema permits (not listed individually). Clients validating "
+                                       "strictly against the standard might reject them.",
+                               ref="DTVP IT-12 / XSD (DE)")
                 else:
                     verdict = "valid" if ok_std else "not valid"
                 res.stats["verdict"] = verdict

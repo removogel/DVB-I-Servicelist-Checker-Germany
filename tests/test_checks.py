@@ -381,6 +381,30 @@ class TestEpg(unittest.TestCase):
         self.assertTrue(all(r[0] and r[1] and r[2] for r in gap_rows))
 
 
+class TestSchemaDeProfile(unittest.TestCase):
+    """Deviations from the standard schema that the DE profile schema permits are not listed."""
+
+    def test_dvbc_without_network_id(self):
+        res = resources_dir()
+        if res == "MISSING":
+            self.skipTest("schemas not available")
+        # DTVP IT-12: DVB-C instance with serviceId only and without NetworkID
+        dvbc = ('<ServiceInstance priority="3"><DVBCDeliveryParameters><DVBTriplet serviceId="28106"/>'
+                '</DVBCDeliveryParameters></ServiceInstance>\n    <ServiceInstance priority="2">')
+        xml = FIXTURE.read_text(encoding="utf-8").replace('<ServiceInstance priority="2">', dvbc, 1)
+        sl = Path(tempfile.mkdtemp()) / "sl.xml"
+        sl.write_text(xml, encoding="utf-8")
+        kw = dict(offline=True, resources_dir=None if res is None else res, allow_download=False)
+        de = run(str(sl), Config(), **kw).module("schema")
+        self.assertTrue(de.stats["valid_de_profile"])
+        self.assertFalse(de.stats["valid_standard"])
+        self.assertNotIn("SC10", [f.code for f in de.findings])           # permitted by the DE profile
+        self.assertEqual(de.stats["deviations_permitted_by_de"], 1)
+        self.assertEqual([f.severity.name for f in de.findings if f.code == "SC30"], ["INFO"])
+        std = run(str(sl), Config(profile="a177"), **kw).module("schema")
+        self.assertEqual({f.severity.name for f in std.findings if f.code == "SC10"}, {"ERROR"})
+
+
 class TestOffline(unittest.TestCase):
     def test_offline_skips_network_modules(self):
         res = resources_dir()

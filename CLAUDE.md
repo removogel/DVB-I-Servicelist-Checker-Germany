@@ -157,6 +157,9 @@ wrong HowRelatedCS version, invalid application contentType).
   (ContentGuideSourceRef – made optional by the same DTVP decision). A service without any content
   guide source is reported as `CG-NOSOURCE` (warning: no EPG/now-next on receivers), and
   `DE-M-CGServiceRef` only applies to services that have a content guide source.
+- **Schema, `de` profile**: `SC10` (standard XSD) is only reported at paths where the DE profile XSD
+  fails too; deviations the DE schema permits are counted in `SC30` (stat
+  `deviations_permitted_by_de`), not listed – e.g. DVB-C without `NetworkID` (DTVP IT-12).
 - **Scope**: this is not a full port of the reference validator; see README "Scope".
 - **Reference validator (`refval`)** is opt-in (`refval_url`), because it sends the whole list
   to a third-party server. The DE variant is requested via the header `X-variants: DE` (POST;

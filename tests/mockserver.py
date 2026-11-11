@@ -234,11 +234,12 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(tva(body), "application/xml")
         # Fixed grid of 90-minute programmes, so programmes span the request boundaries and midnight.
         # Default (A177): every programme starting in [start, end); inclusive=true adds the one running at start.
-        # The "gap" service mimics a faulty server that only returns programmes ending before `end`.
+        # The "gap" service mimics a faulty server: it honours inclusive, but drops programmes that run
+        # past `end` – so a programme spanning a boundary only appears in the following response.
         length = timedelta(minutes=PROGRAMME_MINUTES)
         k = (start - GRID_ANCHOR) // length
         t = GRID_ANCHOR + k * length
-        if t < start and not (q.get("inclusive") == "true" and not gap):
+        if t < start and q.get("inclusive") != "true":
             t += length
         starts = []
         while t < end:

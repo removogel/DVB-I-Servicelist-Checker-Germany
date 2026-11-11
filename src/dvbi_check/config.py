@@ -41,6 +41,7 @@ class Config:
     cg_days_future: int = 7                 # DTVP IT-6: today + 7 days "shall"
     cg_timezone: str = "Europe/Berlin"
     cg_window_hours: int = 12               # A177 6.5.2.1: schedule requests span 6 or 12 hours
+    cg_inclusive: bool = True               # A177 6.5.2.2: request inclusive=true (complete coverage)
     cg_min_coverage: float = 0.9            # minimum share of a day covered by events
     cg_max_gap_minutes: int = 5
     cg_slow_seconds: float = 2.0

@@ -86,6 +86,47 @@ class TestHelpers(unittest.TestCase):
         self.assertEqual(add_query("https://a.de/l.png?v=1", w=160), "https://a.de/l.png?v=1&w=160")
 
 
+class TestWindowBoundaries(unittest.TestCase):
+    """CG-WIN-BOUNDARY: exact detection with inclusive=true, heuristic without."""
+
+    def _blocks(self, inclusive: bool, drop: bool):
+        from dvbi_check.checks.contentguide import Block, Event
+        t0 = datetime(2026, 11, 12, 21, tzinfo=timezone.utc)
+        blocks, length = [], timedelta(minutes=90)
+        grid = [t0 - timedelta(minutes=40) + k * length for k in range(40)]   # programmes span every boundary
+        for i in range(4):
+            bs, be = t0 + i * timedelta(hours=12), t0 + (i + 1) * timedelta(hours=12)
+            evs = [Event(f"crid://example.org/{int(t.timestamp())}", t, length, True) for t in grid
+                   if (bs <= t < be or (inclusive and t < bs < t + length)) and not (drop and t + length > be)]
+            blocks.append(Block(bs, be, f"https://cg.example.org/?b={i}", True, evs))
+        return blocks
+
+    def _run(self, inclusive: bool, drop: bool):
+        from dvbi_check.checks.contentguide import (ServiceCG, check_window_boundaries, inclusive_state,
+                                                    merge_events)
+        blocks = self._blocks(inclusive, drop)
+        svc = type("S", (), {"uid": "tag:example.org,2026:x", "name": "X"})()
+        sc = ServiceCG(svc)
+        sc.stats["inclusive"] = inclusive_state(blocks)
+        ctx = type("C", (), {"cfg": Config()})()
+        check_window_boundaries(ctx, sc, merge_events(blocks), blocks, ZoneInfo("Europe/Berlin"))
+        return sc
+
+    def test_exact_with_inclusive(self):
+        sc = self._run(inclusive=True, drop=True)
+        self.assertEqual(sc.stats["inclusive"], "supported")
+        self.assertEqual(sc.stats["window_boundary_drops"], 3)        # one programme per boundary
+        self.assertEqual([f.code for f in sc.findings], ["CG-WIN-BOUNDARY"])
+        self.assertFalse(self._run(inclusive=True, drop=False).findings)
+
+    def test_heuristic_without_inclusive(self):
+        sc = self._run(inclusive=False, drop=True)
+        self.assertEqual(sc.stats["inclusive"], "not supported")
+        self.assertEqual(sc.stats["window_boundaries_uncovered"], 3)
+        self.assertEqual([f.code for f in sc.findings], ["CG-WIN-BOUNDARY"])
+        self.assertFalse(self._run(inclusive=False, drop=False).findings)
+
+
 class TestHttpCache(unittest.TestCase):
     def test_cache_is_bounded(self):
         with MockServer() as m:
@@ -196,13 +237,21 @@ class TestFullRun(unittest.TestCase):
         # programmes spanning midnight and request boundaries are merged: no gaps, no boundary warning
         self.assertFalse([f for f in cg.findings if f.service == one["service"]
                           and f.code in ("CG-DAY-GAPS", "CG-WIN-BOUNDARY", "CG-DAY-OVERLAP")])
-        self.assertEqual(one["window_boundaries_uncovered"], 0)
-        self.assertEqual(one["inclusive"], "supported")
-        # faulty server dropping programmes that run past the end of the request
+        self.assertEqual(one["inclusive"], "supported")           # requests use inclusive=true
+        self.assertEqual(one["window_boundary_drops"], 0)
+        # faulty server dropping programmes that run past the end of the request: detected exactly,
+        # because the next request returns them as "already running" (inclusive=true)
         radio = by_code(self.rr, "cg", "CG-WIN-BOUNDARY")
         self.assertEqual([f.service for f in radio], ["tag:example.org,2026:radio-gap"])
-        self.assertEqual(stats["tag:example.org,2026:radio-gap"]["inclusive"], "not supported")
-        self.assertEqual(cg.stats["inclusive_supported"], 1)
+        self.assertIn("missing from the request in which they start", radio[0].detail)
+        rs = stats["tag:example.org,2026:radio-gap"]
+        self.assertEqual(rs["inclusive"], "supported")
+        self.assertGreater(rs["window_boundary_drops"], 0)
+        self.assertEqual(cg.stats["inclusive_supported"], 2)
+        # with inclusive the merged schedule of the faulty server is complete from today on
+        # (the mock deliberately returns nothing for past days of this service)
+        self.assertEqual({off: cov for off, cov in rs["days"].items() if int(off) >= 0},
+                         {off: 1.0 for off in rs["days"] if int(off) >= 0})
         nosrc = by_code(self.rr, "cg", "CG-NOSOURCE")
         self.assertTrue(nosrc)
         self.assertEqual({f.severity.name for f in nosrc}, {"WARNING"})   # source optional (DTVP decision)
@@ -317,12 +366,16 @@ class TestEpg(unittest.TestCase):
         self.assertEqual(rows["One"]["Synopsis"], 1)
         self.assertGreater(rows["Radio Three"]["Gaps"], 0)       # server drops programmes at request ends
         self.assertEqual(rows["Radio Three"]["Preview image"], 0)
+        # server that drops programmes at the end of a request (detected via inclusive=true)
+        self.assertIn("missing from the request in which they start", rows["Radio Three"]["Remarks"])
+        self.assertIsNone(rows["One"]["Remarks"])
         self.assertIn("no content guide source", rows["ARD Nord"]["Remarks"])
         # every overview link jumps to the header of its block
         for r in range(6, 6 + len(rows)):
             c = ov.cell(r, 2)
             target = ws[c.hyperlink.location.split("!")[1]].value
             self.assertTrue(target.endswith(c.value), (c.value, target))
+        self.assertTrue([r for r in ws.iter_rows(values_only=True) if r and r[0] == "Server:"])
         gap_rows = [r for r in ws.iter_rows(values_only=True) if r[4] == "— gap —"]
         self.assertTrue(gap_rows)
         self.assertTrue(all(r[0] and r[1] and r[2] for r in gap_rows))

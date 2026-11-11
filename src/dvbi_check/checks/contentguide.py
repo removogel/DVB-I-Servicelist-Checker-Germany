@@ -2,7 +2,8 @@
 
 Requests per A177 clause 6 (as in the DVB-I reference validator):
   ScheduleInfoEndpoint?sid=<id>&now_next=true
-  ScheduleInfoEndpoint?sid=<id>&start=<epoch>&end=<epoch>   (A177 6.5.2: 3-hour aligned, 6 or 12 hours)
+  ScheduleInfoEndpoint?sid=<id>&start=<epoch>&end=<epoch>&inclusive=true
+                                         (A177 6.5.2: 3-hour aligned, 6 or 12 hours)
   ProgramInfoEndpoint?pid=<crid>
 Content requirements: DTVP IT-6 (content guide metadata, tables 41–64).
 """
@@ -296,8 +297,15 @@ def _local_label(dt: datetime, tz) -> str:
     return f"{WEEKDAYS[d.weekday()]} {d:%Y-%m-%d %H:%M}"
 
 
+def block_url(ep: str, sid: str, bs: datetime, be: datetime, inclusive: bool) -> str:
+    q = {"sid": sid, "start": int(bs.timestamp()), "end": int(be.timestamp())}
+    if inclusive:  # A177 6.5.2.2: also the programme already running at start
+        q["inclusive"] = "true"
+    return add_query(ep, **q)
+
+
 def fetch_block(ctx, sc, ep, sid, bs: datetime, be: datetime, tz) -> tuple[Block, list]:
-    url = add_query(ep, sid=sid, start=int(bs.timestamp()), end=int(be.timestamp()))
+    url = block_url(ep, sid, bs, be, ctx.cfg.cg_inclusive)
     block = Block(bs, be, url)
     label = "Time window"
     doc = fetch_tva(ctx, sc, url, label, f"{_local_label(bs, tz)}–{be.astimezone(tz):%H:%M}")
@@ -373,13 +381,58 @@ def evaluate_day(ctx, sc, events: list[Event], blocks: list[Block], day_start: d
         sc.add("CG-DAY-OVERLAP", Severity.WARNING, "Time window: overlapping events", detail=f"{dlabel}: {overlaps}× · {url}")
 
 
+def inclusive_state(blocks) -> str:
+    """Whether the server honoured inclusive=true: a response then starts with the programme
+    that was already running at start_unixtime (A177 6.5.2.2, Schedule@start before the request)."""
+    firsts = [(min(e.start for e in b.events if e.start), b.start) for b in blocks
+              if b.ok and any(e.start for e in b.events)]
+    if not firsts:
+        return "no events"
+    if any(f < s for f, s in firsts):
+        return "supported"
+    if any(f > s for f, s in firsts):
+        return "not supported"
+    return "undetermined"
+
+
+def dropped_at_end(blocks) -> list[tuple]:
+    """Programmes a server left out of the request in which they start (A177 6.5.2.1).
+
+    With inclusive=true, a programme spanning the boundary between two consecutive requests is
+    returned by the second one as "already running". It starts within the first request, so that
+    response must contain it as well. Returns (event, block it is missing from) pairs.
+    """
+    out = []
+    for prev, nxt in zip(blocks, blocks[1:]):
+        if not (prev.ok and nxt.ok) or prev.end != nxt.start:
+            continue
+        have = {(e.crid, e.start) for e in prev.events}
+        for e in nxt.events:
+            if e.start and prev.start <= e.start < prev.end and (e.crid, e.start) not in have:
+                out.append((e, prev))
+    return out
+
+
 def check_window_boundaries(ctx, sc, events: list[Event], blocks: list[Block], tz) -> None:
     """Detects servers that drop events running past the end of the requested period.
 
     A177 6.5.2.1 selects events by PublishedStartTime only, so the last event of a response normally
-    ends after end_unixtime. If no response ever contains such an event and the boundaries between the
-    requests fall into gaps, the programme spanning each boundary is missing from both responses.
+    ends after end_unixtime. With inclusive=true honoured, such drops are identified exactly
+    (dropped_at_end). Otherwise a heuristic is used: if no response ever contains an event running
+    past its end and the boundaries between the requests fall into gaps, the programme spanning each
+    boundary is missing from both responses.
     """
+    msg = "Time window: events running past the end of the requested period are not returned"
+    if sc.stats.get("inclusive") == "supported":
+        drops = dropped_at_end(blocks)
+        sc.stats["window_boundary_drops"] = len(drops)
+        if drops:
+            ex = ", ".join(f"{_local_label(e.start, tz)} ({e.duration.total_seconds() / 60:.0f} min)"
+                           for e, _ in drops[:3])
+            sc.add("CG-WIN-BOUNDARY", Severity.WARNING, msg, ref="A177 6.5.2.1",
+                   detail=f"{len(drops)} programmes missing from the request in which they start, "
+                          f"e.g. {ex} · {drops[0][1].url}")
+        return
     data = [b for b in blocks if b.ok and b.events]
     if len(data) < 3:
         return
@@ -389,34 +442,26 @@ def check_window_boundaries(ctx, sc, events: list[Event], blocks: list[Block], t
     sc.stats["window_boundaries_uncovered"] = len(uncovered)
     if len(uncovered) >= 2 and crossing <= len(data) // 10:
         ex = ", ".join(_local_label(t, tz) for t in uncovered[:3])
-        sc.add("CG-WIN-BOUNDARY", Severity.WARNING,
-               "Time window: events running past the end of the requested period are not returned",
-               ref="A177 6.5.2.1",
+        sc.add("CG-WIN-BOUNDARY", Severity.WARNING, msg, ref="A177 6.5.2.1",
                detail=f"{len(uncovered)} of {len(bounds)} request boundaries fall into a gap, e.g. {ex} · {data[0].url}")
 
 
 def probe_inclusive(ctx, sc, ep, sid, blocks: list[Block], now: datetime) -> None:
-    """Optional inclusive=true (A177 6.5.2.2): recorded in the statistics only, never a finding."""
+    """Only when requests are made without inclusive (cg_inclusive = false): one extra request to
+    record whether the server supports it. Statistics only, never a finding."""
     cur = next((b for b in blocks if b.start <= now < b.end), None)
     if cur is None or not cur.ok:
         return
-    url = add_query(ep, sid=sid, start=int(cur.start.timestamp()), end=int(cur.end.timestamp()), inclusive="true")
-    r = ctx.client.get(url, use_cache=False)
+    r = ctx.client.get(block_url(ep, sid, cur.start, cur.end, True), use_cache=False)
     sc.stats["requests"] = sc.stats.get("requests", 0) + 1
     state = "request failed"
     if r.ok:
         try:
             root = etree.fromstring(r.content, etree.XMLParser(no_network=True, resolve_entities=False, huge_tree=True))
             pd = kid(root, "ProgramDescription")
-            starts = [e.start for s in kids(kid(pd, "ProgramLocationTable"), "Schedule") for e in events_of(s) if e.start]
-            if not starts:
-                state = "no events"
-            elif min(starts) < cur.start:
-                state = "supported"
-            elif min(starts) > cur.start:
-                state = "not supported"
-            else:
-                state = "undetermined"
+            probe = Block(cur.start, cur.end, "", True,
+                          [e for s in kids(kid(pd, "ProgramLocationTable"), "Schedule") for e in events_of(s)])
+            state = inclusive_state([probe])
         except etree.XMLSyntaxError:
             state = "invalid response"
     sc.stats["inclusive"] = state
@@ -437,8 +482,11 @@ def check_schedule(ctx, sc, ep, sid, now: datetime) -> tuple[list[str], list]:
     events = merge_events(blocks)
     for off in offsets:
         evaluate_day(ctx, sc, events, blocks, datetime.combine(today + timedelta(days=off), time(0), tz), off)
+    if ctx.cfg.cg_inclusive:
+        sc.stats["inclusive"] = inclusive_state(blocks)
+    else:
+        probe_inclusive(ctx, sc, ep, sid, blocks, now)
     check_window_boundaries(ctx, sc, events, blocks, tz)
-    probe_inclusive(ctx, sc, ep, sid, blocks, now)
     return [e.crid for b in blocks for e in b.events if e.crid][:3], images
 
 

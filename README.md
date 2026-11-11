@@ -83,7 +83,7 @@ dvbi-check epg <URL> --cg-days-past 1 --cg-days-future 2 --gap-minutes 2
 ```
 
 Writes `dvbi-epg-<date>.xlsx` with the same content guide requests as the `cg` module
-(A177 6.5.2.1, merged per service):
+(A177 6.5.2.1 with `inclusive=true`, merged per service):
 
 - **Overview** – one row per service (ordered by LCN): entries, gaps (> `--gap-minutes`, default 5)
   with total minutes, small gaps, overlaps, coverage, share with synopsis and preview image,
@@ -91,7 +91,8 @@ Writes `dvbi-epg-<date>.xlsx` with the same content guide requests as the `cg` m
 - **EPG** – one block per service with every entry: date, start, end, duration, title, synopsis
   and preview image (yes / no / "no PI" if the ProgramInformation is missing), status, CRID.
   Gaps are inserted as their own rows (red; yellow if ≤ `--gap-minutes`), overlapping entries
-  are orange, missing synopsis or image red.
+  are orange, missing synopsis or image red. A "Server:" line notes programmes the server left out
+  of the request in which they start, and servers that ignore `inclusive=true`.
 
 Output of `run` in `--out` (default `dvbi-report/`):
 
@@ -127,10 +128,15 @@ schema are then reported as warnings, because strictly validating clients might 
   therefore merged per service (duplicates removed) before coverage is evaluated per day in
   `cg_timezone` (default Europe/Berlin). Past days without data are a warning ("should"), today and
   upcoming days an error ("shall").
-- `CG-WIN-BOUNDARY` is reported when a server never returns a programme that runs past the end of
-  the requested period and the request boundaries fall into gaps – the programme spanning each
-  boundary is then missing from both responses. Support of the optional `inclusive=true` is only
+- Requests carry `inclusive=true` (A177 6.5.2.2, `cg_inclusive`, `--no-cg-inclusive` to switch it
+  off), so each response also contains the programme already running at `start` and the merged
+  schedule shows whether a service really has all its programmes. Whether a server honours it is
   recorded in the statistics.
+- `CG-WIN-BOUNDARY`: a programme that starts within a request must be part of that response, even
+  if it ends later (A177 6.5.2.1). With `inclusive=true` honoured, programmes that only appear in the
+  next response as "already running" are reported exactly. For servers that ignore `inclusive`, a
+  heuristic is used: no response ever contains a programme running past its end and the request
+  boundaries fall into gaps.
 - Logo variants are requested via `?image_variant=<value>` (A177 5.2.8.2.1). If your image
   server uses a different parameter name, it can be changed via `image_variant_param`.
 - The LCN plan is checked against the nationwide reference table (TargetRegion = top-level

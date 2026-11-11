@@ -18,9 +18,10 @@ from zoneinfo import ZoneInfo
 
 from lxml import etree
 
-from .checks.contentguide import (TVA_PREFIX, events_of, kid, kids, schedule_blocks, txt)
+from .checks.contentguide import (TVA_PREFIX, Block, block_url, dropped_at_end, events_of, inclusive_state, kid,
+                                  kids, schedule_blocks, txt)
 from .config import Config
-from .httpclient import HttpClient, add_query
+from .httpclient import HttpClient
 from .loader import load
 from .sl import Service, ServiceListDoc
 
@@ -58,6 +59,8 @@ class ServiceEpg:
     endpoint: str | None = None
     rows: list = field(default_factory=list)          # Entry and Gap, chronological
     errors: list[str] = field(default_factory=list)   # failed requests, missing source
+    notes: list[str] = field(default_factory=list)    # server behaviour, e.g. programmes dropped at request ends
+    inclusive: str | None = None                      # whether the server honoured inclusive=true
     requests: int = 0
 
     @property
@@ -102,8 +105,9 @@ def _program_info(pi) -> tuple[str | None, bool, bool]:
     return title, synopsis, image
 
 
-def fetch_entries(client: HttpClient, ep: str, sid: str, bs: datetime, be: datetime) -> tuple[list[Entry], str | None]:
-    url = add_query(ep, sid=sid, start=int(bs.timestamp()), end=int(be.timestamp()))
+def fetch_entries(client: HttpClient, ep: str, sid: str, bs: datetime, be: datetime,
+                  inclusive: bool = True) -> tuple[list[Entry], str | None]:
+    url = block_url(ep, sid, bs, be, inclusive)
     r = client.get(url, use_cache=False)
     if not r.ok:
         return [], f"{r.describe()} · {url}"
@@ -172,7 +176,8 @@ def _lcns(doc: ServiceListDoc) -> dict[str, int]:
 
 
 def collect_service(client: HttpClient, doc: ServiceListDoc, svc: Service, lcn: int | None,
-                    windows: list[tuple[datetime, datetime]], range_start, range_end) -> ServiceEpg:
+                    windows: list[tuple[datetime, datetime]], range_start, range_end,
+                    inclusive: bool = True) -> ServiceEpg:
     se = ServiceEpg(svc.uid, svc.name, lcn)
     cgs = doc.cg_source_for(svc)
     se.endpoint = doc.endpoint(cgs, "ScheduleInfoEndpoint")
@@ -180,13 +185,26 @@ def collect_service(client: HttpClient, doc: ServiceListDoc, svc: Service, lcn: 
         se.errors.append("no content guide source" if cgs is None else "no ScheduleInfoEndpoint")
         return se
     se.sid = doc.cg_service_id(svc)
-    entries = []
+    entries, blocks = [], []
     for bs, be in windows:
-        got, err = fetch_entries(client, se.endpoint, se.sid, bs, be)
+        got, err = fetch_entries(client, se.endpoint, se.sid, bs, be, inclusive)
         se.requests += 1
         entries += got
+        blocks.append(Block(bs, be, block_url(se.endpoint, se.sid, bs, be, inclusive), err is None, got))
         if err:
             se.errors.append(err)
+    if inclusive:
+        se.inclusive = inclusive_state(blocks)
+        if se.inclusive == "supported":
+            drops = dropped_at_end(blocks)
+            if drops:
+                tz = range_start.tzinfo
+                ex = ", ".join(f"{e.start.astimezone(tz):%Y-%m-%d %H:%M}" for e, _ in drops[:3])
+                se.notes.append(f"{len(drops)} programmes are missing from the request in which they start "
+                                f"(A177 6.5.2.1), e.g. {ex} – only returned as 'already running' by the next request")
+        elif se.inclusive == "not supported":
+            se.notes.append("server ignores inclusive=true – programmes running at the start of a request "
+                            "only come from the previous request")
     se.rows = analyse(entries, range_start, range_end)
     return se
 
@@ -212,7 +230,7 @@ def collect(location: str, cfg: Config, services: str | None = None,
     svcs.sort(key=lambda s: (lcns.get(s.uid) is None, lcns.get(s.uid) or 0, (s.name or "").lower()))
     with ThreadPoolExecutor(max_workers=cfg.workers) as ex:
         result = list(ex.map(lambda s: collect_service(client, doc, s, lcns.get(s.uid), windows,
-                                                       range_start, range_end), svcs))
+                                                       range_start, range_end, cfg.cg_inclusive), svcs))
     return doc, result, range_start, range_end
 
 
@@ -279,7 +297,7 @@ def write_workbook(path: Path, doc: ServiceListDoc, result: list[ServiceEpg], ra
     starts, row = [], 1
     for se in result:
         starts.append(row)
-        row += 3 + len(se.errors[:5]) + max(len(se.rows), 1) + 1
+        row += 3 + len(se.errors[:5]) + len(se.notes) + max(len(se.rows), 1) + 1
 
     # ---------------- overview
     for i, w in enumerate([8, 34, 12, 14, 14, 12, 12, 14, 12, 14, 9, 60], start=1):
@@ -291,7 +309,8 @@ def write_workbook(path: Path, doc: ServiceListDoc, result: list[ServiceEpg], ra
 
     ov.append(banner(ov, f"EPG analysis · {doc.name}", "block", ncol))
     ov.append(banner(ov, f"Period {local(range_start):%Y-%m-%d} – {local(range_end) - timedelta(minutes=1):%Y-%m-%d} "
-                         f"({cfg.cg_timezone}), requests of {cfg.cg_window_hours} h (A177 6.5.2.1) · "
+                         f"({cfg.cg_timezone}), requests of {cfg.cg_window_hours} h (A177 6.5.2.1)"
+                         f"{' with inclusive=true' if cfg.cg_inclusive else ''} · "
                          f"created {datetime.now(tz):%Y-%m-%d %H:%M}", "sub", ncol))
     ov.append([cell(ov, "Legend:"), cell(ov, f"gap > {gap_min} min", "gap"),
                cell(ov, f"gap ≤ {gap_min} min", "small"), cell(ov, "overlap", "overlap"),
@@ -305,6 +324,7 @@ def write_workbook(path: Path, doc: ServiceListDoc, result: list[ServiceEpg], ra
         s = se.summary(range_start, range_end, gap_min)
         link = (f"B{6 + n}", f"'EPG'!A{r0}")
         remarks = "; ".join(se.errors[:2]) + (f" (+{len(se.errors) - 2} more)" if len(se.errors) > 2 else "")
+        remarks = "; ".join(x for x in [remarks] + se.notes if x)
         ov.append([
             cell(ov, se.lcn), cell(ov, se.name, link=link),
             cell(ov, s["entries"]),
@@ -316,7 +336,7 @@ def write_workbook(path: Path, doc: ServiceListDoc, result: list[ServiceEpg], ra
             cell(ov, s["synopsis"], "no" if s["synopsis"] is not None and s["synopsis"] < 1 else None, "0%"),
             cell(ov, s["image"], "no" if s["image"] is not None and s["image"] < 1 else None, "0%"),
             cell(ov, s["no_pi"], "no" if s["no_pi"] else None),
-            cell(ov, remarks, "err" if se.errors else None),
+            cell(ov, remarks, "err" if se.errors else ("overlap" if se.notes else None)),
         ])
 
     # ---------------- EPG blocks
@@ -332,6 +352,8 @@ def write_workbook(path: Path, doc: ServiceListDoc, result: list[ServiceEpg], ra
         for err in se.errors[:5]:
             ws.append([cell(ws, "Request failed:" if se.endpoint else "Note:", "err"), None, None, None,
                        cell(ws, err, "err")])
+        for note in se.notes:
+            ws.append([cell(ws, "Server:", "overlap"), None, None, None, cell(ws, note, "overlap")])
         ws.append([cell(ws, h, "head") for h, _ in COLUMNS])
         if not se.rows:
             ws.append([cell(ws, "no entries", "na")])

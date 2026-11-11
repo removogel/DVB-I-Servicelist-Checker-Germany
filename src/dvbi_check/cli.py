@@ -44,6 +44,8 @@ def build_parser() -> argparse.ArgumentParser:
     r.add_argument("--cg-days-future", dest="cg_days_future", type=int)
     r.add_argument("--cg-window-hours", dest="cg_window_hours", type=int, choices=[6, 12],
                    help="length of each schedule request (A177 6.5.2.1: 6 or 12 hours, default 12)")
+    r.add_argument("--cg-inclusive", dest="cg_inclusive", action=argparse.BooleanOptionalAction, default=None,
+                   help="request schedules with inclusive=true (A177 6.5.2.2, default on)")
     r.add_argument("--cg-proxy-host", dest="cg_proxy_hosts", action="append",
                    help="permitted content guide proxy host (can be repeated)")
     r.add_argument("--resources-dir", help="local dvb-i-tools directory (schemas/, res/)")
@@ -69,6 +71,8 @@ def build_parser() -> argparse.ArgumentParser:
     e.add_argument("--cg-days-past", dest="cg_days_past", type=int)
     e.add_argument("--cg-days-future", dest="cg_days_future", type=int)
     e.add_argument("--cg-window-hours", dest="cg_window_hours", type=int, choices=[6, 12])
+    e.add_argument("--cg-inclusive", dest="cg_inclusive", action=argparse.BooleanOptionalAction, default=None,
+                   help="request schedules with inclusive=true (A177 6.5.2.2, default on)")
     e.add_argument("--gap-minutes", dest="cg_max_gap_minutes", type=int,
                    help="gaps longer than this are marked red, shorter ones yellow (default 5)")
 
@@ -102,7 +106,7 @@ def cmd_run(args) -> int:
     logging.basicConfig(level=logging.INFO if args.verbose else logging.WARNING, format="%(levelname)s %(message)s")
     cfg = Config.load(args.config)
     cfg.update(**{k: getattr(args, k) for k in ("postcode", "user_agent", "timeout", "workers", "profile",
-                                                 "cg_max_services", "cg_days_past", "cg_days_future", "cg_window_hours",
+                                                 "cg_max_services", "cg_days_past", "cg_days_future", "cg_window_hours", "cg_inclusive",
                                                  "cg_proxy_hosts", "ait_xsd", "refval_url")})
     try:
         cfg.user_agent.encode("ascii")
@@ -138,7 +142,7 @@ def cmd_epg(args) -> int:
     cfg = Config.load(args.config)
     cfg.update(**{k: getattr(args, k) for k in ("postcode", "user_agent", "timeout", "workers", "cg_max_services",
                                                  "cg_days_past", "cg_days_future", "cg_window_hours",
-                                                 "cg_max_gap_minutes")})
+                                                 "cg_inclusive", "cg_max_gap_minutes")})
     try:
         cfg.user_agent.encode("ascii")
     except UnicodeEncodeError:

@@ -129,7 +129,12 @@ wrong HowRelatedCS version, invalid application contentType).
   (`?sid=…&now_next=true`, `?sid=…&start=…&end=…`, `?pid=…`). Schedule requests obey A177 6.5.2.1
   (3-hour UTC boundaries, 6 or 12 hours, `schedule_blocks()`); responses are merged per service
   (`merge_events()`) before per-day evaluation, because A177 selects events by start time only.
-  The mock answers non-conforming windows with 400.
+  Requests use `inclusive=true` (`cg_inclusive`), as recommended by Paul Higgs for readiness checks:
+  the merged schedule then covers every programme. `dropped_at_end()` identifies programmes missing
+  from the request in which they start (they only appear in the next response as running at
+  start) → `CG-WIN-BOUNDARY`; servers that ignore `inclusive` fall back to the gap heuristic.
+  The mock answers non-conforming windows with 400; its "gap" service honours `inclusive` but drops
+  programmes that run past the end of a request.
 - **LCN rules from Book 6.6** recognise ARD/RTL/SAT.1 via regular expressions
   (`pattern_ard`, `pattern_rtl`, `pattern_sat1`); the reference table is the LCNTable whose
   TargetRegion is the top-level region.

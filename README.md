@@ -74,7 +74,26 @@ cp dvbi-check.example.toml dvbi-check.toml
 dvbi-check run <URL> --config dvbi-check.toml
 ```
 
-Output in `--out` (default `dvbi-report/`):
+### EPG gap analysis (Excel)
+
+```bash
+dvbi-check epg <URL> --out reports/                 # all services
+dvbi-check epg <URL> --services "ZDF|Das Erste"      # only matching services (name or UniqueIdentifier)
+dvbi-check epg <URL> --cg-days-past 1 --cg-days-future 2 --gap-minutes 2
+```
+
+Writes `dvbi-epg-<date>.xlsx` with the same content guide requests as the `cg` module
+(A177 6.5.2.1, merged per service):
+
+- **Overview** – one row per service (ordered by LCN): entries, gaps (> `--gap-minutes`, default 5)
+  with total minutes, small gaps, overlaps, coverage, share with synopsis and preview image,
+  failed requests. The service name links to its block.
+- **EPG** – one block per service with every entry: date, start, end, duration, title, synopsis
+  and preview image (yes / no / "no PI" if the ProgramInformation is missing), status, CRID.
+  Gaps are inserted as their own rows (red; yellow if ≤ `--gap-minutes`), overlapping entries
+  are orange, missing synopsis or image red.
+
+Output of `run` in `--out` (default `dvbi-report/`):
 
 - `dvbi-report-<date>.html` – self-contained report: key figures, module status, service
   matrix, EPG coverage per day, tables for logos, AITs and manifests, filterable findings with
@@ -162,6 +181,7 @@ src/dvbi_check/
   sl.py             service list access
   httpclient.py     HTTP with cache, retries, timing
   resources.py      XSD / classification schemes (pinned)
+  epg.py            EPG gap analysis → Excel (dvbi-check epg)
   checks/           schema, a177, profile_de, contentguide, images, ait, mpd
   report/           HTML (Jinja2), JSON, CSV
 ```

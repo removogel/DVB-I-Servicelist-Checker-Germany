@@ -58,6 +58,8 @@ checks/
   mpd.py          DASH MPDs, HLS reachability
   refval.py       optional: DVB-I reference validator via REST (POST, line → service mapping)
 report/           build_view() → Jinja2 template report.html.j2; JSON; CSV (; + BOM)
+epg.py            `dvbi-check epg`: all schedule entries per service → Excel (openpyxl, write-only
+                  mode for flat memory); reuses schedule_blocks()/events_of() from contentguide
 ```
 
 Each module exports `run(ctx: Context) -> ModuleResult`. Network modules set `res.skipped`

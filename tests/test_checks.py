@@ -275,6 +275,59 @@ class TestRefVal(TestFullRun):
         self.assertEqual(Handler.last_refval_headers.get("X-variants"), "DE")
 
 
+class TestEpg(unittest.TestCase):
+    """EPG gap analysis (dvbi-check epg) – analysis and Excel output."""
+
+    def test_analyse(self):
+        from dvbi_check.epg import Entry, Gap, analyse
+        tz = ZoneInfo("Europe/Berlin")
+        d0 = datetime(2026, 11, 11, tzinfo=tz)
+
+        def e(h, m, dur, crid):
+            s = d0 + timedelta(hours=h, minutes=m)
+            return Entry(s, s + timedelta(minutes=dur), crid)
+
+        rows = analyse([e(-1, 30, 120, "a"), e(0, 30, 90, "b"), e(2, 0, 60, "c"), e(2, 0, 60, "c"),
+                        e(3, 2, 58, "d"), e(5, 0, 60, "e"), e(30, 0, 60, "outside")],
+                       d0, d0 + timedelta(hours=8))
+        kinds = [(type(r).__name__, getattr(r, "crid", None)) for r in rows]
+        self.assertEqual(kinds, [("Entry", "a"), ("Entry", "b"), ("Entry", "c"), ("Gap", None), ("Entry", "d"),
+                                 ("Gap", None), ("Entry", "e"), ("Gap", None)])   # duplicate c and outside dropped
+        self.assertEqual(rows[1].status, "overlap")                              # b starts before a ends
+        self.assertEqual(rows[1].overlap_min, 60)
+        gaps = [r.minutes for r in rows if isinstance(r, Gap)]
+        self.assertEqual(gaps, [2, 60, 120])                                     # small gap, gap, trailing gap
+
+    def test_workbook(self):
+        from openpyxl import load_workbook
+        from dvbi_check.cli import main
+        tmp = Path(tempfile.mkdtemp())
+        with MockServer() as m:
+            sl = tmp / "sl.xml"
+            sl.write_text(FIXTURE.read_text(encoding="utf-8").replace("{BASE}", m.base), encoding="utf-8")
+            rc = main(["epg", str(sl), "--out", str(tmp / "epg.xlsx"), "--cg-days-past", "1",
+                       "--cg-days-future", "2", "--workers", "4"])
+        self.assertEqual(rc, 0)
+        wb = load_workbook(tmp / "epg.xlsx")
+        self.assertEqual(wb.sheetnames, ["Overview", "EPG"])
+        ov, ws = wb["Overview"], wb["EPG"]
+        head = [c.value for c in ov[5]]
+        rows = {r[1]: dict(zip(head, r)) for r in ov.iter_rows(min_row=6, values_only=True) if r[1]}
+        self.assertEqual(rows["One"]["Gaps"], 0)                 # A177-conformant server: no gaps
+        self.assertEqual(rows["One"]["Synopsis"], 1)
+        self.assertGreater(rows["Radio Three"]["Gaps"], 0)       # server drops programmes at request ends
+        self.assertEqual(rows["Radio Three"]["Preview image"], 0)
+        self.assertIn("no content guide source", rows["ARD Nord"]["Remarks"])
+        # every overview link jumps to the header of its block
+        for r in range(6, 6 + len(rows)):
+            c = ov.cell(r, 2)
+            target = ws[c.hyperlink.location.split("!")[1]].value
+            self.assertTrue(target.endswith(c.value), (c.value, target))
+        gap_rows = [r for r in ws.iter_rows(values_only=True) if r[4] == "— gap —"]
+        self.assertTrue(gap_rows)
+        self.assertTrue(all(r[0] and r[1] and r[2] for r in gap_rows))
+
+
 class TestOffline(unittest.TestCase):
     def test_offline_skips_network_modules(self):
         res = resources_dir()

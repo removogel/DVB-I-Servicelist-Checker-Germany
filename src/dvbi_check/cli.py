@@ -1,4 +1,4 @@
-"""Command line: dvbi-check run | resources."""
+"""Command line: dvbi-check run | epg | resources."""
 from __future__ import annotations
 
 import argparse
@@ -16,6 +16,7 @@ Examples:
   dvbi-check run https://example.org/servicelist.xml --user-agent "<certified UA>"
   dvbi-check run list.xml --modules schema,a177,profile          (offline)
   dvbi-check run URL --postcode 06217 --cg-max-services 10 --out reports/
+  dvbi-check epg URL --out reports/                              (EPG gap analysis as Excel)
   dvbi-check resources update
 """
 
@@ -53,6 +54,23 @@ def build_parser() -> argparse.ArgumentParser:
     r.add_argument("--fail-on", choices=["error", "warning", "never"], default="error",
                    help="exit code 1 on errors/warnings (for CI)")
     r.add_argument("-v", "--verbose", action="store_true")
+
+    e = sub.add_parser("epg", help="EPG gap analysis: all content guide entries per service as an Excel workbook")
+    e.add_argument("source", help="URL or file of the service list")
+    e.add_argument("--out", default="dvbi-report",
+                   help="output directory or .xlsx file (default: dvbi-report/dvbi-epg-<date>.xlsx)")
+    e.add_argument("--config", help="TOML configuration file")
+    e.add_argument("--services", help="only services whose name or UniqueIdentifier matches this regular expression")
+    e.add_argument("--postcode", help="postcode for server-side regionalisation (?postcode=)")
+    e.add_argument("--user-agent", dest="user_agent", help="HTTP User-Agent (Book 11.1: allowlist)")
+    e.add_argument("--timeout", type=float)
+    e.add_argument("--workers", type=int, help="parallel requests")
+    e.add_argument("--cg-max-services", dest="cg_max_services", type=int, help="only the first N services")
+    e.add_argument("--cg-days-past", dest="cg_days_past", type=int)
+    e.add_argument("--cg-days-future", dest="cg_days_future", type=int)
+    e.add_argument("--cg-window-hours", dest="cg_window_hours", type=int, choices=[6, 12])
+    e.add_argument("--gap-minutes", dest="cg_max_gap_minutes", type=int,
+                   help="gaps longer than this are marked red, shorter ones yellow (default 5)")
 
     rs = sub.add_parser("resources", help="manage XSD schemas and classification schemes")
     rs.add_argument("action", choices=["update", "path"])
@@ -115,6 +133,29 @@ def cmd_run(args) -> int:
     return 0
 
 
+def cmd_epg(args) -> int:
+    from .epg import run_epg
+    cfg = Config.load(args.config)
+    cfg.update(**{k: getattr(args, k) for k in ("postcode", "user_agent", "timeout", "workers", "cg_max_services",
+                                                 "cg_days_past", "cg_days_future", "cg_window_hours",
+                                                 "cg_max_gap_minutes")})
+    try:
+        cfg.user_agent.encode("ascii")
+    except UnicodeEncodeError:
+        print(f"Invalid User-Agent {cfg.user_agent!r}: HTTP headers may only contain ASCII characters.", file=sys.stderr)
+        return 2
+    print(f"Fetching content guide data for {args.source} …", file=sys.stderr)
+    try:
+        path, result = run_epg(args.source, cfg, Path(args.out), args.services)
+    except Exception as e:  # noqa: BLE001
+        print(f"EPG analysis failed: {type(e).__name__}: {e}", file=sys.stderr)
+        return 2
+    n = sum(len(se.entries) for se in result)
+    print(f"{len(result)} services, {n} EPG entries, {sum(se.requests for se in result)} requests")
+    print(f"→ {path}")
+    return 0
+
+
 def _summary(rr) -> None:
     lst = rr.meta.get("list", {})
     print(f"\n{lst.get('name')} · version {lst.get('version')} · {lst.get('revision')} · {lst.get('services')} services")
@@ -130,4 +171,6 @@ def main(argv=None) -> int:
     args = build_parser().parse_args(argv)
     if args.cmd == "resources":
         return cmd_resources(args)
+    if args.cmd == "epg":
+        return cmd_epg(args)
     return cmd_run(args)
